@@ -1,54 +1,49 @@
-# SmartExam AI — Privacy Model & Data Minimization Charter
-
-## Core Philosophy: "Detect Behavior, Not The Person"
-
-Conventional remote proctoring relies on intrusive surveillance mechanisms: continuous webcam recordings, algorithmic facial recognition, emotional tracking, room panning, and ambient microphone listening. These mechanisms introduce severe demographic bias, violate personal privacy, cause intense student anxiety, and collect disproportionate personal data.
-
-**SmartExam AI rejects invasive surveillance.**
-
-Instead, the platform evaluates purely non-invasive behavioral telemetry and interaction mechanics within the exam interface.
+# ExamGuard AI — Privacy Charter & Ethical Principles
+**Guiding Principle**: *Detect Behavior, Not the Person*
 
 ---
 
-## 1. What We Collect
+## 1. The Problem with Conventional Remote Proctoring
 
-| Signal | Purpose | Storage Format |
-|---|---|---|
-| **Tab Focus / Window State** | Detect when student leaves exam browser tab | Event count & duration in milliseconds |
-| **Clipboard Interaction** | Detect copy/paste attempts | Event timestamp & char count only (**No clipboard text stored**) |
-| **Keystroke Dynamics** | Pacing and typing rhythm | Aggregated WPM & interval variance (**No key content stored**) |
-| **Mouse Interaction** | Movement density and pauses | Movement score (0-100) & idle duration (**No raw coordinates**) |
-| **Question Navigation** | Reading sequence and review pattern | Question index transitions & elapsed time |
+Most commercial proctoring solutions rely on surveillance-heavy architectures:
+- Continuous webcam recording and streaming
+- Automated facial recognition and identity scanning
+- Gaze and eye-tracking algorithms
+- Room sweeps and 360-degree environment video
+- Continuous microphone recording and ambient audio analysis
+- Operating system background process scraping and biometric profiling
 
----
-
-## 2. What We Explicitly DO NOT Collect
-
-- ❌ **No continuous webcam footage**
-- ❌ **No facial recognition or identity scanning**
-- ❌ **No gaze tracking or eye movement surveillance**
-- ❌ **No microphone recording or acoustic profiling**
-- ❌ **No unrelated browsing history or external tabs**
-- ❌ **No keystroke content (passwords, sentences, or queries)**
-- ❌ **No background operating system files or process scraping**
+These approaches create severe harms:
+1. **Dignity & Privacy**: Students are forced to invite surveillance cameras into their personal living spaces.
+2. **Algorithmic Bias**: Commercial facial recognition consistently misidentifies candidates with darker skin tones and misinterprets neurodivergent behaviors (e.g. eye contact avoidance, stimming).
+3. **Anxiety & Distraction**: Stress from artificial surveillance degrades academic performance.
+4. **Data Vulnerability**: Storing hours of sensitive home video creates immense institutional liability.
 
 ---
 
-## 3. Data Minimization & Retention
+## 2. ExamGuard AI Privacy Charter
 
-1. **Immediate In-Memory Aggregation**: Raw cursor positions and key events are aggregated within the client/extension buffer into statistical indices (`mouse_activity_score`, `typing_variance`) before transmission.
-2. **Configurable Retention Policy**:
-   - Examination session features and anomaly reports are retained for the institutional grade verification window (configurable default: 30 days).
-   - High-granularity event timelines are automatically purged or anonymized after examiner review sign-off.
-3. **Student Transparency**:
-   - Students are informed before beginning the exam of all active telemetry sensors.
-   - Live indicators show extension connection status and non-invasive mode confirmation.
+ExamGuard AI was founded on a strict alternative:
 
----
+### 1. Zero Physical Surveillance
+- **NO Continuous Webcam Recording**: No video feeds are captured, streamed, or stored.
+- **NO Facial Recognition**: We never scan or store biometric facial markers.
+- **NO Eye or Gaze Tracking**: Candidate eye movements are never tracked or analyzed.
+- **NO Microphone Recording**: We never listen to or store audio from the student's room.
+- **NO Operating System Process Scraping**: We do not scrape background applications or unrelated browser tabs.
 
-## 4. Human-in-the-Loop Principle
+### 2. Minimum Necessary Behavioral Telemetry
+The system monitors only the minimum signals directly pertinent to the examination viewport:
+- **Focus Continuity**: Does the candidate stay in the examination tab during the exam?
+- **Interaction Rhythm**: Is typing cadence consistent with human authorship?
+- **Clipboard Activity**: Are large text blocks or code snippets copied or pasted?
+- **Code Execution Dynamics**: Are test cases run iteratively or all at once?
 
-The AI system is strictly an **anomaly detector**, never a judge.
-- It produces signals: `"Potential behavioral anomaly detected"` or `"Review recommended"`.
-- It **never declares "Student cheated"**.
-- Final decisions require contextual evaluation by authorized institutional academic examiners.
+### 3. Student Transparency & Informed Consent
+- Candidates see an upfront summary of all monitoring policies prior to beginning any test.
+- Every signal captured is visible in the student's post-exam review.
+- No stealth or invisible monitoring hooks.
+
+### 4. Decision-Support Only (Human-in-the-Loop)
+- The algorithm never passes automatic disciplinary judgments.
+- It provides objective data to qualified faculty examiners who make all contextual determinations.

@@ -1,6 +1,14 @@
+/**
+ * ExamGuard AI - Student Examination Interface
+ * ED-02 — AI-Based Exam Malpractice Detection
+ * Detect Behavior, Not the Person
+ */
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Exam, Question, ExamSession, BehaviorEvent } from '../../types';
 import { api } from '../../services/api';
+import { CodeWorkspace } from '../../components/coding/CodeWorkspace';
+import { DescriptiveWorkspace } from '../../components/descriptive/DescriptiveWorkspace';
 import {
   Clock,
   ChevronLeft,
@@ -8,10 +16,12 @@ import {
   Send,
   AlertTriangle,
   CheckCircle2,
-  HelpCircle,
   Shield,
-  EyeOff,
-  Copy,
+  Maximize2,
+  Minimize2,
+  Code,
+  FileText,
+  ListFilter,
 } from 'lucide-react';
 
 interface ExamInterfaceProps {
@@ -29,14 +39,15 @@ export const ExamInterface: React.FC<ExamInterfaceProps> = ({
   onSubmitSuccess,
 }) => {
   const [currentQIndex, setCurrentQIndex] = useState<number>(0);
-  const [answers, setAnswers] = useState<Record<string, number>>(session.answers || {});
+  const [answers, setAnswers] = useState<Record<string, any>>(session.answers || {});
   const [timeLeftSec, setTimeLeftSec] = useState<number>(exam.durationMinutes * 60);
   const [lastAutosaveTime, setLastAutosaveTime] = useState<string>('Just now');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [showSubmitModal, setShowSubmitModal] = useState<boolean>(false);
   const [telemetryNotice, setTelemetryNotice] = useState<{ message: string; type: 'warn' | 'info' } | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
 
-  // Telemetry buffer ref
+  // Telemetry buffer ref & metrics
   const telemetryBuffer = useRef<Partial<BehaviorEvent>[]>([]);
   const lastFocusLoss = useRef<number>(0);
   const keyTimestamps = useRef<number[]>([]);
@@ -71,11 +82,11 @@ export const ExamInterface: React.FC<ExamInterfaceProps> = ({
     };
     telemetryBuffer.current.push(event);
 
-    // If buffer exceeds 10 items or significant event, flush immediately
     if (
       telemetryBuffer.current.length >= 8 ||
       eventType === 'TAB_FOCUS_LOST' ||
-      eventType === 'PASTE_ATTEMPT'
+      eventType === 'PASTE_ATTEMPT' ||
+      eventType === 'LARGE_CODE_INSERTION'
     ) {
       flushTelemetry();
     }
@@ -87,8 +98,8 @@ export const ExamInterface: React.FC<ExamInterfaceProps> = ({
     telemetryBuffer.current = [];
     try {
       await api.sendBehaviorEvents(session.id, batch);
-    } catch (e) {
-      // re-queue on error
+    } catch {
+      // Re-queue on network hiccup to prevent data loss
       telemetryBuffer.current = [...batch, ...telemetryBuffer.current];
     }
   };
@@ -102,11 +113,16 @@ export const ExamInterface: React.FC<ExamInterfaceProps> = ({
     return () => clearInterval(interval);
   }, [answers, session.id]);
 
-  // Window Focus & Blur Listener
+  // Window Focus, Blur, Clipboard & Fullscreen Listeners
   useEffect(() => {
     const handleBlur = () => {
       lastFocusLoss.current = Date.now();
-      recordEvent('TAB_FOCUS_LOST', { reason: 'browser_window_blur' });
+      recordEvent('TAB_FOCUS_LOST', {
+        reason: 'window_blur',
+        questionIndex: currentQIndex,
+        questionId: questions[currentQIndex]?.id,
+        questionType: questions[currentQIndex]?.questionType,
+      });
       setTelemetryNotice({
         message: 'Exam window lost focus. Focus transitions are logged for proctor review.',
         type: 'warn',
@@ -131,9 +147,10 @@ export const ExamInterface: React.FC<ExamInterfaceProps> = ({
       }
     };
 
-    const handleCopy = (e: ClipboardEvent) => {
+    const handleCopy = () => {
       recordEvent('COPY_ATTEMPT', {
         charCount: window.getSelection()?.toString().length || 0,
+        questionIndex: currentQIndex,
       });
       setTelemetryNotice({
         message: 'Notice: Content copying is logged in the session audit trail.',
@@ -144,7 +161,11 @@ export const ExamInterface: React.FC<ExamInterfaceProps> = ({
 
     const handlePaste = (e: ClipboardEvent) => {
       const len = e.clipboardData?.getData('text')?.length || 0;
-      recordEvent('PASTE_ATTEMPT', { charCount: len });
+      recordEvent('PASTE_ATTEMPT', {
+        charCount: len,
+        questionIndex: currentQIndex,
+        questionType: questions[currentQIndex]?.questionType,
+      });
       setTelemetryNotice({
         message: 'Notice: External clipboard paste logged.',
         type: 'warn',
@@ -172,6 +193,21 @@ export const ExamInterface: React.FC<ExamInterfaceProps> = ({
       }
     };
 
+    const handleFullscreenChange = () => {
+      const inFullscreen = !!document.fullscreenElement;
+      setIsFullscreen(inFullscreen);
+      if (inFullscreen) {
+        recordEvent('FULLSCREEN_ENTERED');
+      } else {
+        recordEvent('FULLSCREEN_EXITED');
+        setTelemetryNotice({
+          message: 'Notice: Exited fullscreen mode. Fullscreen status is monitored.',
+          type: 'warn',
+        });
+        setTimeout(() => setTelemetryNotice(null), 4000);
+      }
+    };
+
     window.addEventListener('blur', handleBlur);
     window.addEventListener('focus', handleFocus);
     document.addEventListener('visibilitychange', handleVisibility);
@@ -179,6 +215,7 @@ export const ExamInterface: React.FC<ExamInterfaceProps> = ({
     document.addEventListener('paste', handlePaste);
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
 
     return () => {
       window.removeEventListener('blur', handleBlur);
@@ -188,18 +225,30 @@ export const ExamInterface: React.FC<ExamInterfaceProps> = ({
       document.removeEventListener('paste', handlePaste);
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
     };
-  }, []);
+  }, [currentQIndex, questions]);
 
-  const saveCurrentAnswers = async (currentAns: Record<string, number>) => {
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(() => {});
+    } else {
+      document.exitFullscreen().catch(() => {});
+    }
+  };
+
+  const saveCurrentAnswers = async (currentAns: Record<string, any>) => {
     try {
-      await api.autosaveAnswers(session.id, currentAns);
-      setLastAutosaveTime(new Date().toLocaleTimeString());
+      const answeredCount = Object.keys(currentAns).length;
+      const progress = Math.round((answeredCount / Math.max(1, questions.length)) * 100);
+      await api.autosaveAnswers(session.id, currentAns, progress);
+      setLastAutosaveTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
     } catch (err) {
       console.warn('Autosave warning:', err);
     }
   };
 
+  // MCQ Selection handler
   const handleSelectOption = (optIndex: number) => {
     const q = questions[currentQIndex];
     if (!q) return;
@@ -215,13 +264,32 @@ export const ExamInterface: React.FC<ExamInterfaceProps> = ({
     });
   };
 
+  // Coding answer change handler
+  const handleCodingAnswerChange = (val: any) => {
+    const q = questions[currentQIndex];
+    if (!q) return;
+    const updated = { ...answers, [q.id]: val };
+    setAnswers(updated);
+  };
+
+  // Descriptive answer change handler
+  const handleDescriptiveAnswerChange = (val: string) => {
+    const q = questions[currentQIndex];
+    if (!q) return;
+    const updated = { ...answers, [q.id]: val };
+    setAnswers(updated);
+  };
+
   const handleNavigateQuestion = (index: number) => {
     if (index === currentQIndex || index < 0 || index >= questions.length) return;
 
     const timeSpent = Math.round((Date.now() - qStartTime.current) / 1000);
+    const targetQ = questions[index];
+
     recordEvent('QUESTION_CHANGED', {
       fromIndex: currentQIndex,
       questionIndex: index,
+      questionType: targetQ?.questionType,
       timeSpentSec: timeSpent,
     });
 
@@ -234,6 +302,9 @@ export const ExamInterface: React.FC<ExamInterfaceProps> = ({
     await flushTelemetry();
     try {
       const res = await api.submitExam(session.id, answers);
+      if (document.fullscreenElement) {
+        document.exitFullscreen().catch(() => {});
+      }
       onSubmitSuccess(res.session);
     } catch (err) {
       console.error('Final submit failed:', err);
@@ -248,7 +319,13 @@ export const ExamInterface: React.FC<ExamInterfaceProps> = ({
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
-  const answeredCount = Object.keys(answers).length;
+  const answeredCount = Object.keys(answers).filter((k) => {
+    const ans = answers[k];
+    if (ans === undefined || ans === null || ans === '') return false;
+    if (typeof ans === 'object' && !ans.code) return false;
+    return true;
+  }).length;
+
   const isUrgent = timeLeftSec < 300; // < 5 mins
 
   return (
@@ -264,13 +341,21 @@ export const ExamInterface: React.FC<ExamInterfaceProps> = ({
               {exam.title}
             </div>
             <div className="text-[11px] text-slate-500">
-              Autosaved at {lastAutosaveTime} · Non-invasive telemetry active
+              Autosaved at {lastAutosaveTime} · Non-invasive behavioral telemetry active
             </div>
           </div>
         </div>
 
-        {/* Timer & Submit CTA */}
-        <div className="flex items-center gap-4">
+        {/* Controls: Fullscreen, Timer & Finish */}
+        <div className="flex items-center gap-3">
+          <button
+            onClick={toggleFullscreen}
+            title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
+            className="p-1.5 rounded text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+          >
+            {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+          </button>
+
           <div
             className={`flex items-center gap-1.5 px-3 py-1 rounded font-mono text-xs font-semibold ${
               isUrgent
@@ -306,47 +391,83 @@ export const ExamInterface: React.FC<ExamInterfaceProps> = ({
         <main className="lg:col-span-8 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-6 shadow-xs space-y-6">
           {currentQ ? (
             <>
-              {/* Question Header */}
-              <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3 text-xs text-slate-500">
-                <span className="font-semibold text-slate-700 dark:text-slate-300">
-                  Question {currentQIndex + 1} of {questions.length}
-                </span>
-                <span className="font-mono">{currentQ.marks} Marks</span>
+              {/* Question Header & Type Badge */}
+              <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3 text-xs">
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-slate-700 dark:text-slate-300">
+                    Question {currentQIndex + 1} of {questions.length}
+                  </span>
+                  <span
+                    className={`px-2 py-0.5 rounded text-[10px] font-mono font-medium ${
+                      currentQ.questionType === 'CODING'
+                        ? 'bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300'
+                        : currentQ.questionType === 'DESCRIPTIVE'
+                        ? 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300'
+                        : 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300'
+                    }`}
+                  >
+                    {currentQ.questionType === 'CODING'
+                      ? 'Coding Challenge'
+                      : currentQ.questionType === 'DESCRIPTIVE'
+                      ? 'Descriptive Analysis'
+                      : 'Multiple Choice'}
+                  </span>
+                </div>
+                <span className="font-mono text-slate-500">{currentQ.marks} Marks</span>
               </div>
 
-              {/* Question Text */}
-              <div className="text-sm font-medium text-slate-900 dark:text-white leading-relaxed select-none">
-                {currentQ.questionText}
-              </div>
+              {/* Question Workspace Switching */}
+              {currentQ.questionType === 'CODING' ? (
+                <CodeWorkspace
+                  question={currentQ}
+                  sessionId={session.id}
+                  savedAnswer={answers[currentQ.id]}
+                  onAnswerChange={handleCodingAnswerChange}
+                  onTelemetryEvent={recordEvent}
+                />
+              ) : currentQ.questionType === 'DESCRIPTIVE' ? (
+                <DescriptiveWorkspace
+                  question={currentQ}
+                  savedAnswer={answers[currentQ.id]}
+                  onAnswerChange={handleDescriptiveAnswerChange}
+                  onTelemetryEvent={recordEvent}
+                />
+              ) : (
+                /* Multiple Choice Question */
+                <div className="space-y-4">
+                  <div className="text-sm font-medium text-slate-900 dark:text-white leading-relaxed select-none">
+                    {currentQ.questionText}
+                  </div>
 
-              {/* Options */}
-              <div className="space-y-2.5 pt-2">
-                {currentQ.options.map((optionText, optIdx) => {
-                  const isSelected = answers[currentQ.id] === optIdx;
-                  return (
-                    <button
-                      key={optIdx}
-                      onClick={() => handleSelectOption(optIdx)}
-                      className={`w-full text-left p-3.5 rounded-lg border text-xs transition-colors flex items-start gap-3 ${
-                        isSelected
-                          ? 'border-slate-900 bg-slate-50 dark:border-white dark:bg-slate-800/80 font-medium text-slate-900 dark:text-white shadow-xs'
-                          : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 text-slate-700 dark:text-slate-300'
-                      }`}
-                    >
-                      <span
-                        className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 border text-[11px] font-mono ${
-                          isSelected
-                            ? 'bg-slate-900 text-white border-slate-900 dark:bg-white dark:text-slate-900 dark:border-white font-bold'
-                            : 'border-slate-300 dark:border-slate-700 text-slate-500'
-                        }`}
-                      >
-                        {String.fromCharCode(65 + optIdx)}
-                      </span>
-                      <span className="leading-snug pt-0.5">{optionText}</span>
-                    </button>
-                  );
-                })}
-              </div>
+                  <div className="space-y-2.5 pt-2">
+                    {currentQ.options?.map((optionText, optIdx) => {
+                      const isSelected = answers[currentQ.id] === optIdx;
+                      return (
+                        <button
+                          key={optIdx}
+                          onClick={() => handleSelectOption(optIdx)}
+                          className={`w-full text-left p-3.5 rounded-lg border text-xs transition-colors flex items-start gap-3 ${
+                            isSelected
+                              ? 'border-slate-900 bg-slate-50 dark:border-white dark:bg-slate-800/80 font-medium text-slate-900 dark:text-white shadow-xs'
+                              : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 text-slate-700 dark:text-slate-300'
+                          }`}
+                        >
+                          <span
+                            className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 border text-[11px] font-mono ${
+                              isSelected
+                                ? 'bg-slate-900 text-white border-slate-900 dark:bg-white dark:text-slate-900 dark:border-white font-bold'
+                                : 'border-slate-300 dark:border-slate-700 text-slate-500'
+                            }`}
+                          >
+                            {String.fromCharCode(65 + optIdx)}
+                          </span>
+                          <span className="leading-snug pt-0.5">{optionText}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               {/* Navigation Controls */}
               <div className="flex items-center justify-between pt-6 border-t border-slate-100 dark:border-slate-800">
@@ -403,7 +524,7 @@ export const ExamInterface: React.FC<ExamInterfaceProps> = ({
                   <button
                     key={q.id}
                     onClick={() => handleNavigateQuestion(idx)}
-                    className={`h-9 rounded text-xs font-mono font-medium transition-colors flex items-center justify-center border ${
+                    className={`h-11 rounded text-xs font-mono font-medium transition-colors flex flex-col items-center justify-center border relative ${
                       isCurrent
                         ? 'border-slate-900 bg-slate-900 text-white dark:border-white dark:bg-white dark:text-slate-900 shadow-xs'
                         : isAnswered
@@ -411,7 +532,10 @@ export const ExamInterface: React.FC<ExamInterfaceProps> = ({
                         : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300'
                     }`}
                   >
-                    {idx + 1}
+                    <span>{idx + 1}</span>
+                    <span className="text-[9px] uppercase tracking-tighter opacity-80">
+                      {q.questionType === 'CODING' ? 'CODE' : q.questionType === 'DESCRIPTIVE' ? 'DESC' : 'MCQ'}
+                    </span>
                   </button>
                 );
               })}
@@ -433,14 +557,14 @@ export const ExamInterface: React.FC<ExamInterfaceProps> = ({
             </div>
           </div>
 
-          {/* Privacy & Telemetry Sensor Card */}
+          {/* Privacy & Behavioral Guarantee Card */}
           <div className="bg-slate-50 dark:bg-slate-900/50 border border-slate-200/80 dark:border-slate-800 rounded-lg p-4 text-xs space-y-2">
             <div className="flex items-center gap-1.5 font-medium text-slate-800 dark:text-slate-200">
               <Shield className="w-3.5 h-3.5 text-emerald-500" />
-              <span>Non-Invasive Proctoring Active</span>
+              <span>Non-Invasive Integrity Monitoring</span>
             </div>
             <p className="text-slate-500 text-[11px] leading-relaxed">
-              Interaction biometrics are continuously recorded. Avoid leaving the exam window or copying external text to keep your session within the normal baseline.
+              ExamGuard AI evaluates interaction dynamics (window focus, typing cadence, clipboard events) rather than invasive webcam surveillance.
             </p>
           </div>
         </aside>
@@ -457,7 +581,7 @@ export const ExamInterface: React.FC<ExamInterfaceProps> = ({
             <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
               You have answered <strong>{answeredCount}</strong> out of <strong>{questions.length}</strong> questions.
               {answeredCount < questions.length && (
-                <span className="block mt-1 text-amber-600 dark:text-amber-400">
+                <span className="block mt-1 text-amber-600 dark:text-amber-400 font-medium">
                   Warning: You have {questions.length - answeredCount} unanswered question(s).
                 </span>
               )}
@@ -477,7 +601,7 @@ export const ExamInterface: React.FC<ExamInterfaceProps> = ({
                 disabled={isSubmitting}
                 className="px-4 py-1.5 rounded bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-semibold hover:bg-slate-800 dark:hover:bg-slate-100 flex items-center gap-1.5"
               >
-                {isSubmitting ? 'Submitting...' : 'Yes, Submit Exam'}
+                {isSubmitting ? 'Finalizing...' : 'Yes, Submit Exam'}
               </button>
             </div>
           </div>

@@ -1,3 +1,9 @@
+/**
+ * ExamGuard AI - Session Forensics & Proctor Inspector
+ * ED-02 — AI-Based Exam Malpractice Detection
+ * Detect Behavior, Not the Person
+ */
+
 import React, { useState, useEffect } from 'react';
 import { ExamSession, BehaviorEvent, AnomalyReport, BaselineFeatureComparison } from '../../types';
 import { api } from '../../services/api';
@@ -10,10 +16,13 @@ import {
   Clock,
   ShieldAlert,
   FileText,
-  User,
   Activity,
   Layers,
   Save,
+  Code2,
+  Terminal,
+  Cpu,
+  Shield,
 } from 'lucide-react';
 
 interface SessionDetailProps {
@@ -27,7 +36,7 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
   const [anomalyReport, setAnomalyReport] = useState<AnomalyReport | null>(null);
   const [featureComparison, setFeatureComparison] = useState<BaselineFeatureComparison[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [activeTab, setActiveTab] = useState<'comparison' | 'timeline' | 'explanation'>('comparison');
+  const [activeTab, setActiveTab] = useState<'comparison' | 'explanation' | 'timeline' | 'coding'>('comparison');
 
   // Proctor review form
   const [proctorStatus, setProctorStatus] = useState<'UNREVIEWED' | 'REVIEWED' | 'FLAGGED'>('UNREVIEWED');
@@ -64,7 +73,7 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
         proctorStatus,
         proctorNotes,
       });
-      setSaveSuccessMsg('Proctor evaluation saved.');
+      setSaveSuccessMsg('Proctor evaluation saved successfully.');
       setTimeout(() => setSaveSuccessMsg(null), 3000);
     } catch (err) {
       console.error('Failed to update review:', err);
@@ -76,13 +85,13 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
   if (loading || !session) {
     return (
       <div className="py-24 text-center text-slate-500 text-xs">
-        Loading biometric session forensics...
+        Loading behavioral session forensics...
       </div>
     );
   }
 
   const riskScore = session.riskScore || 0;
-  const isElevated = riskScore >= 55;
+  const features = session.features;
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8 space-y-6">
@@ -144,7 +153,7 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
 
           <div className="h-10 w-px bg-slate-200 dark:bg-slate-700" />
 
-          <div className="max-w-[180px] text-[11px] text-slate-600 dark:text-slate-300 leading-tight">
+          <div className="max-w-[190px] text-[11px] text-slate-600 dark:text-slate-300 leading-tight">
             <strong>Core Principle:</strong>
             <span className="block text-slate-500 text-[10px] mt-0.5">
               Behavioral anomaly signal. Never automatic accusation.
@@ -164,7 +173,7 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
           }`}
         >
           <Layers className="w-3.5 h-3.5" />
-          Baseline Feature Comparison
+          Baseline Comparison
         </button>
 
         <button
@@ -180,6 +189,18 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
         </button>
 
         <button
+          onClick={() => setActiveTab('coding')}
+          className={`pb-2.5 px-3 text-xs font-medium border-b-2 transition-colors flex items-center gap-1.5 ${
+            activeTab === 'coding'
+              ? 'border-slate-900 text-slate-900 dark:border-white dark:text-white font-semibold'
+              : 'border-transparent text-slate-500 hover:text-slate-800'
+          }`}
+        >
+          <Code2 className="w-3.5 h-3.5" />
+          Coding Forensics
+        </button>
+
+        <button
           onClick={() => setActiveTab('timeline')}
           className={`pb-2.5 px-3 text-xs font-medium border-b-2 transition-colors flex items-center gap-1.5 ${
             activeTab === 'timeline'
@@ -192,7 +213,7 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
         </button>
       </div>
 
-      {/* Tab 1: Baseline Feature Comparison (Key Requirement) */}
+      {/* Tab 1: Baseline Feature Comparison */}
       {activeTab === 'comparison' && (
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 shadow-xs space-y-4">
           <div>
@@ -209,7 +230,7 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
               <thead className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-500 uppercase tracking-wider text-[10px]">
                 <tr>
                   <th className="py-2.5 px-3 font-semibold">Biometric Signal</th>
-                  <th className="py-2.5 px-3 font-semibold">Baseline Normal (μ ± σ)</th>
+                  <th className="py-2.5 px-3 font-semibold">Baseline Normal</th>
                   <th className="py-2.5 px-3 font-semibold">Session Observed</th>
                   <th className="py-2.5 px-3 font-semibold">Z-Score Deviation</th>
                   <th className="py-2.5 px-3 font-semibold text-right">Classification</th>
@@ -219,20 +240,20 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
                 {featureComparison.map((row, idx) => (
                   <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/30">
                     <td className="py-2.5 px-3 font-sans font-medium text-slate-800 dark:text-slate-200">
-                      {row.featureName}
+                      {row.label || row.featureName}
                     </td>
-                    <td className="py-2.5 px-3 text-slate-500">
-                      {row.baselineMean} ± {row.baselineStd}
+                    <td className="py-2.5 px-3 text-slate-500 font-mono">
+                      {row.baseline}
                     </td>
                     <td className="py-2.5 px-3 font-semibold text-slate-900 dark:text-white">
-                      {row.sessionValue}
+                      {row.sessionValue || `${row.sessionVal} ${row.unit}`}
                     </td>
                     <td className="py-2.5 px-3">
                       <span
                         className={
-                          Math.abs(row.zScore ?? 0) >= 2.5
+                          Math.abs(row.zScore ?? 0) >= 2.2
                             ? 'text-rose-600 dark:text-rose-400 font-bold'
-                            : Math.abs(row.zScore ?? 0) >= 1.5
+                            : Math.abs(row.zScore ?? 0) >= 1.4
                             ? 'text-amber-600 dark:text-amber-400'
                             : 'text-slate-600 dark:text-slate-400'
                         }
@@ -271,9 +292,25 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
       {activeTab === 'explanation' && (
         <div className="space-y-4">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 shadow-xs space-y-4">
-            <h2 className="text-sm font-semibold text-slate-900 dark:text-white">
-              Isolation Forest & Scoring Attribution
-            </h2>
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-sm font-semibold text-slate-900 dark:text-white">
+                  Isolation Forest ML & Scoring Attribution
+                </h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Explainable biometric point breakdown and decision-support guidance
+                </p>
+              </div>
+
+              <div className="flex items-center gap-1.5 font-mono text-[10px] text-slate-400">
+                <span className="bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">
+                  {anomalyReport?.modelVersion || 'behavioral-iforest-v2'}
+                </span>
+                <span className="bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">
+                  {anomalyReport?.scoringVersion || 'risk-v2'}
+                </span>
+              </div>
+            </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="p-4 rounded-lg bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800 space-y-2 text-xs">
@@ -282,11 +319,11 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
                   <div className="flex justify-between">
                     <span className="text-slate-500">Model Engine:</span>
                     <span className="font-mono text-slate-900 dark:text-white">
-                      {anomalyReport?.modelUsed || 'Isolation Forest v1.2'}
+                      {anomalyReport?.modelUsed || 'Isolation Forest ML v1.2'}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-500">Anomaly Probability:</span>
+                    <span className="text-slate-500">Raw Anomaly Score:</span>
                     <span className="font-mono font-semibold text-slate-900 dark:text-white">
                       {((anomalyReport?.anomalyScore || 0) * 100).toFixed(1)}%
                     </span>
@@ -301,7 +338,7 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
               </div>
 
               <div className="p-4 rounded-lg bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800 space-y-2 text-xs">
-                <div className="text-slate-500 font-medium">Examiner Recommendation</div>
+                <div className="text-slate-500 font-medium">Human Examiner Recommendation</div>
                 <p className="text-slate-700 dark:text-slate-300 leading-relaxed text-[11px]">
                   {anomalyReport?.recommendation ||
                     'Review interaction timeline and clipboard metadata before finalizing verification.'}
@@ -315,15 +352,38 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
                 Detected Behavioral Anomalies & Point Attribution
               </div>
 
-              {anomalyReport?.detectedPatterns && anomalyReport.detectedPatterns.length > 0 ? (
-                <div className="space-y-1.5">
-                  {anomalyReport.detectedPatterns.map((pattern, idx) => (
+              {anomalyReport?.contributingFactors && anomalyReport.contributingFactors.length > 0 ? (
+                <div className="space-y-2">
+                  {anomalyReport.contributingFactors.map((factor, idx) => (
                     <div
                       key={idx}
-                      className="p-3 rounded-md bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200/80 dark:border-amber-900/40 text-xs text-amber-900 dark:text-amber-200 flex items-start gap-2"
+                      className="p-3.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/30 space-y-1.5"
                     >
-                      <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
-                      <span>{pattern}</span>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-semibold text-slate-900 dark:text-white flex items-center gap-1.5">
+                          <AlertTriangle
+                            className={`w-3.5 h-3.5 ${
+                              factor.severity === 'high'
+                                ? 'text-rose-500'
+                                : factor.severity === 'medium'
+                                ? 'text-amber-500'
+                                : 'text-blue-500'
+                            }`}
+                          />
+                          {factor.factor}
+                        </span>
+                        <span className="font-mono font-bold text-slate-700 dark:text-slate-300">
+                          +{factor.points} pts
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-600 dark:text-slate-400">
+                        {factor.explanation}
+                      </p>
+                      <div className="flex items-center gap-4 text-[10px] font-mono text-slate-400 pt-1">
+                        <span>Observed: {factor.sessionValue}</span>
+                        <span>·</span>
+                        <span>Expected Baseline: {factor.baselineValue}</span>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -334,18 +394,99 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
                 </div>
               )}
             </div>
+          </div>
+        </div>
+      )}
 
-            {/* Explainable text output */}
-            {anomalyReport?.explanation && (
-              <div className="mt-3 p-3 rounded bg-slate-50 dark:bg-slate-800/60 text-xs font-mono text-slate-700 dark:text-slate-300 whitespace-pre-line border border-slate-200 dark:border-slate-800">
-                {anomalyReport.explanation}
+      {/* Tab 3: Coding Forensics */}
+      {activeTab === 'coding' && (
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 shadow-xs space-y-5">
+          <div>
+            <h2 className="text-sm font-semibold text-slate-900 dark:text-white">
+              Coding Workspace Telemetry & Submissions
+            </h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Code editor interaction rhythm, test runs, compile success rates, and sudden code insertion bursts
+            </p>
+          </div>
+
+          {/* Coding Telemetry Metrics Grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+            <div className="p-3 rounded border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40">
+              <div className="text-slate-400 text-[11px]">Code Edit Duration</div>
+              <div className="font-mono text-base font-semibold text-slate-900 dark:text-white mt-0.5">
+                {features?.code_edit_duration ?? 0}s
+              </div>
+            </div>
+
+            <div className="p-3 rounded border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40">
+              <div className="text-slate-400 text-[11px]">Code Test Runs</div>
+              <div className="font-mono text-base font-semibold text-slate-900 dark:text-white mt-0.5">
+                {features?.code_run_count ?? 0} runs
+              </div>
+            </div>
+
+            <div className="p-3 rounded border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40">
+              <div className="text-slate-400 text-[11px]">Large Insertions</div>
+              <div
+                className={`font-mono text-base font-semibold mt-0.5 ${
+                  (features?.large_insertion_count ?? 0) > 0 ? 'text-rose-600' : 'text-emerald-600'
+                }`}
+              >
+                {features?.large_insertion_count ?? 0} bursts
+              </div>
+            </div>
+
+            <div className="p-3 rounded border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40">
+              <div className="text-slate-400 text-[11px]">Code Pastes</div>
+              <div
+                className={`font-mono text-base font-semibold mt-0.5 ${
+                  (features?.code_paste_count ?? 0) > 0 ? 'text-amber-600' : 'text-slate-900 dark:text-white'
+                }`}
+              >
+                {features?.code_paste_count ?? 0} pastes
+              </div>
+            </div>
+          </div>
+
+          {/* Submitted Code View */}
+          <div className="space-y-3">
+            <h3 className="text-xs font-semibold text-slate-900 dark:text-white">
+              Student Code Responses
+            </h3>
+
+            {Object.entries(session.answers || {}).filter(([_, val]) => typeof val === 'object' && val.code).length > 0 ? (
+              Object.entries(session.answers || {})
+                .filter(([_, val]) => typeof val === 'object' && val.code)
+                .map(([qId, val]: [string, any]) => (
+                  <div key={qId} className="border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden text-xs">
+                    <div className="bg-slate-100 dark:bg-slate-800 px-4 py-2 flex items-center justify-between border-b border-slate-200 dark:border-slate-700">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-slate-900 dark:text-white">Question {qId}</span>
+                        <span className="font-mono text-[11px] uppercase bg-slate-200 dark:bg-slate-700 px-2 py-0.5 rounded">
+                          {val.language}
+                        </span>
+                      </div>
+                      <span className="text-[11px] font-mono text-emerald-600 dark:text-emerald-400">
+                        {val.passedTests}/{val.totalTests} Tests Passed
+                      </span>
+                    </div>
+
+                    <pre className="p-4 bg-slate-950 text-slate-200 font-mono text-[11px] overflow-x-auto">
+                      {val.code}
+                    </pre>
+                  </div>
+                ))
+            ) : (
+              <div className="py-6 text-center text-slate-400 text-xs">
+                No coding question responses recorded in this session.
               </div>
             )}
           </div>
         </div>
       )}
 
-      {/* Tab 3: Event Timeline */}
+      {/* Tab 4: Event Timeline */}
       {activeTab === 'timeline' && (
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 shadow-xs space-y-4">
           <div className="flex items-center justify-between">

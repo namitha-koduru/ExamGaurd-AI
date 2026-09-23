@@ -41,10 +41,13 @@ function MainApp() {
   };
 
   const handleStartExamSession = async (examId: string) => {
-    const res = await api.startExam(examId);
-    setActiveSession(res.session);
-    setSessionQuestions(res.questions);
-    setSelectedExam(res.exam);
+    const [startRes, examRes] = await Promise.all([
+      api.startExam(examId),
+      api.getExam(examId),
+    ]);
+    setActiveSession(startRes.session);
+    setSessionQuestions(examRes.questions);
+    setSelectedExam(examRes.exam);
     setCurrentTab('exam-active');
   };
 

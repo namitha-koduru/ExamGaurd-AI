@@ -10,7 +10,10 @@ interface StudentDashboardProps {
   onViewResult?: (session: ExamSession) => void;
 }
 
-export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onSelectExam }) => {
+export const StudentDashboard: React.FC<StudentDashboardProps> = ({
+  onSelectExam,
+  onViewResult,
+}) => {
   const { user } = useAuth();
   const [exams, setExams] = useState<Exam[]>([]);
   const [pastSessions, setPastSessions] = useState<ExamSession[]>([]);
@@ -108,10 +111,18 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onSelectExam
 
                 <div className="mt-5 pt-3">
                   {hasCompleted ? (
-                    <div className="w-full py-2 px-3 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-medium flex items-center justify-center gap-1.5 cursor-default">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-                      Exam Completed
-                    </div>
+                    <button
+                      onClick={() => {
+                        const matchingSession = pastSessions.find((s) => s.examId === exam.id && s.status === 'SUBMITTED');
+                        if (matchingSession && onViewResult) {
+                          onViewResult(matchingSession);
+                        }
+                      }}
+                      className="w-full py-2 px-3 rounded-md bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-xs font-medium flex items-center justify-center gap-1.5 hover:bg-emerald-100 transition-colors"
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Completed · View Result</span>
+                    </button>
                   ) : (
                     <button
                       onClick={() => onSelectExam(exam)}

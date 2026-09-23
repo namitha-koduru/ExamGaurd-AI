@@ -29,19 +29,22 @@ const logger = new ExtensionEventLogger(async (events) => {
 window.addEventListener('message', (event) => {
   if (event.source !== window || !event.data) return;
 
-  if (event.data.type === 'SMARTEXAM_ATTACH_SESSION') {
+  if (event.data.type === 'EXAMGUARD_ATTACH_SESSION' || event.data.type === 'SMARTEXAM_ATTACH_SESSION') {
     activeSessionId = event.data.sessionId;
     if (activeSessionId) {
       logger.setSession(activeSessionId);
-      logger.log('EXTENSION_ATTACHED', { timestamp: Date.now() });
-      console.log(`[SmartExam Extension] Attached telemetry sensor to session: ${activeSessionId}`);
+      logger.log('EXTENSION_ATTACHED', {
+        timestamp: Date.now(),
+        handshakeToken: event.data.handshakeToken || 'verified',
+      });
+      console.log(`[ExamGuard Extension] Attached telemetry sensor to session: ${activeSessionId}`);
     }
   }
 
-  if (event.data.type === 'SMARTEXAM_DETACH_SESSION') {
+  if (event.data.type === 'EXAMGUARD_DETACH_SESSION' || event.data.type === 'SMARTEXAM_DETACH_SESSION') {
     logger.flush();
     activeSessionId = null;
-    console.log('[SmartExam Extension] Detached telemetry sensor');
+    console.log('[ExamGuard Extension] Detached telemetry sensor');
   }
 });
 

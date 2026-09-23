@@ -1,5 +1,6 @@
 /**
- * SmartExam AI - Authentication & Role Context
+ * ExamGuard AI - Authentication & Role Context
+ * Real JWT-backed auth with graceful role-switching
  */
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
@@ -20,22 +21,23 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(localStorage.getItem('smartexam_token'));
+  const [token, setToken] = useState<string | null>(
+    localStorage.getItem('examguard_token') || localStorage.getItem('smartexam_token')
+  );
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   useEffect(() => {
     async function initUser() {
-      const storedToken = localStorage.getItem('smartexam_token');
+      const storedToken = localStorage.getItem('examguard_token') || localStorage.getItem('smartexam_token');
       if (storedToken) {
         try {
           const res = await api.getMe();
           setUser(res.user);
-        } catch (err) {
-          // Token expired or invalid, fallback to default student
-          setDefaultStudent();
+        } catch {
+          await authenticateDefaultStudent();
         }
       } else {
-        setDefaultStudent();
+        await authenticateDefaultStudent();
       }
       setIsLoading(false);
     }
@@ -43,47 +45,57 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     initUser();
   }, []);
 
-  const setDefaultStudent = () => {
-    const studentUser: User = {
-      id: 'usr-student-1',
-      name: 'Alex Rivera',
-      email: 'alex.student@smartexam.edu',
-      role: 'STUDENT',
-      createdAt: '2026-09-01T08:00:00Z',
-    };
-    setUser(studentUser);
-    const mockToken = 'token-usr-student-1';
-    setToken(mockToken);
-    localStorage.setItem('smartexam_token', mockToken);
+  const authenticateDefaultStudent = async () => {
+    try {
+      const res = await api.login('alex.student@smartexam.edu', 'password123');
+      setUser(res.user);
+      setToken(res.token);
+      localStorage.setItem('examguard_token', res.token);
+    } catch {
+      // Fallback in case backend is initializing
+      const studentUser: User = {
+        id: 'usr-student-1',
+        name: 'Alex Rivera',
+        email: 'alex.student@smartexam.edu',
+        role: 'STUDENT',
+        createdAt: '2026-09-01T08:00:00Z',
+      };
+      setUser(studentUser);
+    }
   };
 
   const login = async (email: string, pass: string) => {
     const res = await api.login(email, pass);
     setUser(res.user);
     setToken(res.token);
-    localStorage.setItem('smartexam_token', res.token);
+    localStorage.setItem('examguard_token', res.token);
   };
 
   const register = async (name: string, email: string, pass: string, role: string) => {
     const res = await api.register(name, email, pass, role);
     setUser(res.user);
     setToken(res.token);
-    localStorage.setItem('smartexam_token', res.token);
+    localStorage.setItem('examguard_token', res.token);
   };
 
   const logout = () => {
     setUser(null);
     setToken(null);
+    localStorage.removeItem('examguard_token');
     localStorage.removeItem('smartexam_token');
   };
 
   const switchUserRole = async (targetRole: UserRole) => {
-    if (targetRole === 'STUDENT') {
-      await login('alex.student@smartexam.edu', 'password123');
-    } else if (targetRole === 'EXAMINER') {
-      await login('elena.examiner@smartexam.edu', 'password123');
-    } else {
-      await login('admin@smartexam.edu', 'password123');
+    try {
+      if (targetRole === 'STUDENT') {
+        await login('alex.student@smartexam.edu', 'password123');
+      } else if (targetRole === 'EXAMINER') {
+        await login('elena.examiner@smartexam.edu', 'password123');
+      } else {
+        await login('admin@smartexam.edu', 'password123');
+      }
+    } catch (err) {
+      console.warn('Role switch login error:', err);
     }
   };
 

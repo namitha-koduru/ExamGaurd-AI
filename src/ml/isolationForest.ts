@@ -1,6 +1,8 @@
 /**
- * SmartExam AI - Behavioral Biometric Anomaly Detection Engine
+ * ExamGuard AI - Behavioral Biometric Anomaly Detection Engine
  * Isolation Forest & Explainable Deterministic Risk Scoring
+ * Model Version: behavioral-iforest-v2
+ * Detect Behavior, Not the Person
  */
 
 import {
@@ -31,6 +33,19 @@ export const BEHAVIORAL_BASELINE: Record<
   question_revisit_count: { min: 0, max: 5, mean: 1.8, std: 1.2, unit: 'revisits', label: 'Question Revisit Count' },
   back_navigation_count: { min: 0, max: 6, mean: 2.1, std: 1.5, unit: 'back-steps', label: 'Back Navigation Count' },
   session_duration: { min: 300, max: 3600, mean: 1200, std: 350, unit: 'sec', label: 'Session Duration' },
+
+  // Coding specific baselines
+  code_edit_duration: { min: 30, max: 1200, mean: 300, std: 120, unit: 'sec', label: 'Code Edit Duration' },
+  code_run_count: { min: 1, max: 15, mean: 5, std: 3, unit: 'runs', label: 'Code Test Runs' },
+  code_submit_count: { min: 1, max: 4, mean: 1.5, std: 0.8, unit: 'submits', label: 'Code Submissions' },
+  large_insertion_count: { min: 0, max: 0, mean: 0.02, std: 0.1, unit: 'bursts', label: 'Large Insertion Bursts' },
+  code_paste_count: { min: 0, max: 0, mean: 0.05, std: 0.2, unit: 'pastes', label: 'Code Paste Events' },
+  compile_failure_count: { min: 0, max: 8, mean: 2.5, std: 2.0, unit: 'errors', label: 'Compilation Errors' },
+  compile_success_count: { min: 1, max: 12, mean: 3.5, std: 2.5, unit: 'success', label: 'Compilation Success' },
+  test_execution_count: { min: 1, max: 20, mean: 6.0, std: 4.0, unit: 'tests', label: 'Test Executions' },
+  time_between_edits: { min: 2, max: 45, mean: 12, std: 8, unit: 'sec', label: 'Time Between Edits' },
+  coding_focus_loss_count: { min: 0, max: 1, mean: 0.3, std: 0.5, unit: 'events', label: 'Focus Loss in Coding' },
+  coding_focus_loss_duration: { min: 0, max: 4, mean: 0.8, std: 1.5, unit: 'sec', label: 'Focus Lost in Coding (s)' },
 };
 
 /**
@@ -58,16 +73,38 @@ export function extractFeaturesFromEvents(
   let currentQuestion = 0;
   let lastQuestionChangeTime = 0;
 
+  // Coding metrics tracking
+  let codeEditDuration = 0;
+  let codeRunCount = 0;
+  let codeSubmitCount = 0;
+  let largeInsertionCount = 0;
+  let codePasteCount = 0;
+  let compileFailureCount = 0;
+  let compileSuccessCount = 0;
+  let testExecutionCount = 0;
+  let codingFocusLossCount = 0;
+  let codingFocusLossDuration = 0;
+  let activeQuestionIsCoding = false;
+  let lastEditTimestamp = 0;
+  const editIntervals: number[] = [];
+
   for (const event of events) {
     switch (event.eventType) {
       case 'TAB_FOCUS_LOST':
       case 'WINDOW_BLUR':
         focusLossCount++;
+        if (activeQuestionIsCoding) {
+          codingFocusLossCount++;
+        }
         break;
       case 'TAB_FOCUS_RETURNED':
       case 'WINDOW_FOCUS':
         if (event.metadata.durationMs) {
-          focusLossDuration += event.metadata.durationMs / 1000;
+          const sec = event.metadata.durationMs / 1000;
+          focusLossDuration += sec;
+          if (activeQuestionIsCoding) {
+            codingFocusLossDuration += sec;
+          }
         }
         break;
       case 'COPY_ATTEMPT':
@@ -75,6 +112,38 @@ export function extractFeaturesFromEvents(
         break;
       case 'PASTE_ATTEMPT':
         pasteCount++;
+        if (activeQuestionIsCoding) {
+          codePasteCount++;
+        }
+        break;
+      case 'LARGE_CODE_INSERTION':
+        largeInsertionCount++;
+        break;
+      case 'CODE_EDIT_ACTIVITY':
+        if (event.metadata.durationMs) {
+          codeEditDuration += event.metadata.durationMs / 1000;
+        } else {
+          codeEditDuration += 2;
+        }
+        if (lastEditTimestamp > 0) {
+          const gap = (event.timestamp - lastEditTimestamp) / 1000;
+          if (gap > 0 && gap < 120) {
+            editIntervals.push(gap);
+          }
+        }
+        lastEditTimestamp = event.timestamp;
+        break;
+      case 'CODE_RUN':
+        codeRunCount++;
+        testExecutionCount += event.metadata.totalTests || 1;
+        if (event.metadata.compileStatus === 'COMPILE_ERROR' || event.metadata.passedTests === 0) {
+          compileFailureCount++;
+        } else {
+          compileSuccessCount++;
+        }
+        break;
+      case 'CODE_SUBMIT':
+        codeSubmitCount++;
         break;
       case 'KEYBOARD_ACTIVITY':
         if (event.metadata.speedWpm !== undefined) {
@@ -107,6 +176,7 @@ export function extractFeaturesFromEvents(
         questionVisitedCounts[targetQ] = (questionVisitedCounts[targetQ] || 0) + 1;
         currentQuestion = targetQ;
         lastQuestionChangeTime = event.timestamp;
+        activeQuestionIsCoding = event.metadata.questionType === 'CODING';
         break;
       }
       default:
@@ -137,6 +207,11 @@ export function extractFeaturesFromEvents(
     if (v > 1) questionRevisitCount += v - 1;
   });
 
+  const avgEditInterval =
+    editIntervals.length > 0
+      ? Math.round(editIntervals.reduce((a, b) => a + b, 0) / editIntervals.length)
+      : 12;
+
   return {
     typing_speed: typingSpeed,
     typing_variance: typingVariance,
@@ -152,6 +227,19 @@ export function extractFeaturesFromEvents(
     question_revisit_count: questionRevisitCount,
     back_navigation_count: backNavCount,
     session_duration: Math.max(1, sessionDurationSec),
+
+    // Coding features
+    code_edit_duration: Math.round(codeEditDuration),
+    code_run_count: codeRunCount,
+    code_submit_count: codeSubmitCount,
+    large_insertion_count: largeInsertionCount,
+    code_paste_count: codePasteCount,
+    compile_failure_count: compileFailureCount,
+    compile_success_count: compileSuccessCount,
+    test_execution_count: testExecutionCount,
+    time_between_edits: avgEditInterval,
+    coding_focus_loss_count: codingFocusLossCount,
+    coding_focus_loss_duration: Math.round(codingFocusLossDuration * 10) / 10,
   };
 }
 
@@ -197,9 +285,7 @@ export class IsolationForest {
   }
 
   private buildPretrainedForest() {
-    // Generate synthetic normal training sample vectors based on baseline distributions
     const trainingSamples: number[][] = [];
-    // Seeded generator for 100% deterministic reproducibility
     let seed = 42;
     const random = () => {
       seed = (seed * 9301 + 49297) % 233280;
@@ -210,7 +296,6 @@ export class IsolationForest {
       const sample: number[] = [];
       for (const feat of this.featureNames) {
         const b = BEHAVIORAL_BASELINE[feat];
-        // Gaussian approximation via Box-Muller
         const u1 = Math.max(0.0001, random());
         const u2 = random();
         const z = Math.sqrt(-2.0 * Math.log(u1)) * Math.cos(2.0 * Math.PI * u2);
@@ -220,9 +305,7 @@ export class IsolationForest {
       trainingSamples.push(sample);
     }
 
-    // Build trees
     for (let t = 0; t < this.numTrees; t++) {
-      // Draw sub-sample
       const subSample: number[][] = [];
       for (let s = 0; s < this.subSampleSize; s++) {
         const idx = Math.floor(random() * trainingSamples.length);
@@ -282,7 +365,6 @@ export class IsolationForest {
     }
   }
 
-  // Harmonic number approximation constant c(n)
   private c(n: number): number {
     if (n <= 1) return 0;
     if (n === 2) return 1;
@@ -290,12 +372,8 @@ export class IsolationForest {
     return 2.0 * (Math.log(n - 1) + eulerGamma) - (2.0 * (n - 1)) / n;
   }
 
-  /**
-   * Score sample vector -> returns anomaly score between 0.0 and 1.0
-   * s(x, n) = 2 ^ (- E(h(x)) / c(n))
-   */
   public score(features: BehavioralFeatures): number {
-    const sample = this.featureNames.map((k) => features[k]);
+    const sample = this.featureNames.map((k) => features[k] ?? 0);
     let totalPathLength = 0;
     for (const tree of this.trees) {
       totalPathLength += this.pathLength(sample, tree, 0);
@@ -319,7 +397,7 @@ export function calculateExplainableRisk(
   useML: boolean = true
 ): AnomalyReport {
   let mlScore = 0.35;
-  let modelUsed: 'Isolation Forest ML v1.2' | 'Deterministic Rule Fallback' = 'Isolation Forest ML v1.2';
+  let modelUsed = 'Isolation Forest ML v1.2';
 
   try {
     if (useML) {
@@ -334,33 +412,35 @@ export function calculateExplainableRisk(
   const contributingFactors: ContributingFactor[] = [];
   const detectedPatterns: string[] = [];
 
+  // 1. Focus Loss Deviation
   let focusScore = 0;
   if (features.focus_loss_count > 0 || features.focus_loss_duration > 3) {
     const countExcess = Math.max(0, features.focus_loss_count - 1);
     const durationExcess = Math.max(0, features.focus_loss_duration - 4);
-    focusScore = Math.min(30, countExcess * 7 + Math.min(15, durationExcess * 1.5));
-    if (focusScore > 6) {
+    focusScore = Math.min(25, countExcess * 7 + Math.min(12, durationExcess * 1.5));
+    if (focusScore > 5) {
       contributingFactors.push({
-        factor: 'Tab Focus Loss & Window Blur',
+        factor: 'Tab Focus Loss & Window Transitions',
         points: Math.round(focusScore),
         explanation: `${features.focus_loss_count} focus changes (${Math.round(features.focus_loss_duration)}s away) vs expected baseline of 0–2 (< 5s)`,
-        severity: focusScore > 18 ? 'high' : focusScore > 10 ? 'medium' : 'low',
+        severity: focusScore > 16 ? 'high' : focusScore > 8 ? 'medium' : 'low',
         featureName: 'focus_loss_count',
         sessionValue: `${features.focus_loss_count} events (${Math.round(features.focus_loss_duration)}s)`,
         baselineValue: '0–2 events (< 5s)',
       });
-      detectedPatterns.push('Unusual tab focus deviation during exam session');
+      detectedPatterns.push('Unusual tab focus transitions during examination');
     }
   }
 
+  // 2. Clipboard Activity
   let copyPasteScore = 0;
   if (features.copy_count > 0 || features.paste_count > 0) {
-    copyPasteScore = Math.min(30, features.copy_count * 10 + features.paste_count * 15);
+    copyPasteScore = Math.min(25, features.copy_count * 8 + features.paste_count * 12);
     contributingFactors.push({
       factor: 'Clipboard Manipulation Detected',
       points: Math.round(copyPasteScore),
       explanation: `${features.copy_count} copy and ${features.paste_count} paste events recorded during session`,
-      severity: copyPasteScore >= 20 ? 'high' : 'medium',
+      severity: copyPasteScore >= 16 ? 'high' : 'medium',
       featureName: 'paste_count',
       sessionValue: `${features.copy_count} copies, ${features.paste_count} pastes`,
       baselineValue: '0 clipboard interactions',
@@ -368,25 +448,75 @@ export function calculateExplainableRisk(
     detectedPatterns.push('Anomalous clipboard activity on question interface');
   }
 
+  // 3. Coding Specific Anomalies
+  let codingScore = 0;
+  const largeInsertions = features.large_insertion_count || 0;
+  const codePastes = features.code_paste_count || 0;
+  const codingFocusLoss = features.coding_focus_loss_count || 0;
+
+  if (largeInsertions > 0) {
+    const insertionPoints = Math.min(20, largeInsertions * 12);
+    codingScore += insertionPoints;
+    contributingFactors.push({
+      factor: 'Large Code Block Insertion',
+      points: insertionPoints,
+      explanation: `${largeInsertions} sudden large code insertion event(s) recorded without preceding incremental editing`,
+      severity: 'high',
+      featureName: 'large_insertion_count',
+      sessionValue: `${largeInsertions} burst insertion(s)`,
+      baselineValue: '0 burst insertions (gradual edits expected)',
+    });
+    detectedPatterns.push('Abrupt insertion of complete code structure without incremental development');
+  }
+
+  if (codePastes > 0 && largeInsertions === 0) {
+    const pastePoints = Math.min(15, codePastes * 8);
+    codingScore += pastePoints;
+    contributingFactors.push({
+      factor: 'External Code Pasting',
+      points: pastePoints,
+      explanation: `${codePastes} paste events observed inside coding workspace`,
+      severity: 'medium',
+      featureName: 'code_paste_count',
+      sessionValue: `${codePastes} code pastes`,
+      baselineValue: '0 external pastes',
+    });
+    detectedPatterns.push('External code paste event into the code editor');
+  }
+
+  if (codingFocusLoss > 1 && (largeInsertions > 0 || codePastes > 0)) {
+    codingScore += 10;
+    contributingFactors.push({
+      factor: 'Correlated Focus Loss Around Code Insertions',
+      points: 10,
+      explanation: `Focus switch occurred directly adjacent to code insertion events (${codingFocusLoss} coding focus changes)`,
+      severity: 'high',
+      featureName: 'coding_focus_loss_count',
+      sessionValue: `${codingFocusLoss} focus shifts`,
+      baselineValue: '0–1 focus shifts',
+    });
+    detectedPatterns.push('Coinciding focus transitions and code workspace changes');
+  }
+
+  // 4. Timing Anomalies
   let timingScore = 0;
   if (features.average_answer_time < 20 && features.session_duration > 40) {
-    // Unusually rapid answer time (reading complex question usually takes > 30s)
-    timingScore += 16;
+    timingScore += 14;
     contributingFactors.push({
       factor: 'Rapid Answer Cadence',
-      points: 16,
+      points: 14,
       explanation: `Average answer time of ${features.average_answer_time}s is significantly below typical reading pace (35–120s)`,
       severity: 'medium',
       featureName: 'average_answer_time',
       sessionValue: `${features.average_answer_time}s`,
       baselineValue: '35–120s',
     });
-    detectedPatterns.push('Statistically improbable answer pace (sub-reading threshold)');
+    detectedPatterns.push('Unusually rapid answer cadence below typical reading threshold');
   } else if (features.average_answer_time > 180) {
-    timingScore += 8;
+    timingScore += 6;
     contributingFactors.push({
       factor: 'Prolonged Inactivity Between Answers',
-      points: 8,
+      points: 6,
       explanation: `Extended pauses per question averaging ${features.average_answer_time}s`,
       severity: 'low',
       featureName: 'average_answer_time',
@@ -395,68 +525,69 @@ export function calculateExplainableRisk(
     });
   }
 
+  // 5. Navigation Patterns
   let navigationScore = 0;
   if (features.back_navigation_count > 8 || features.question_navigation_count > 30) {
-    navigationScore = Math.min(15, Math.round(features.back_navigation_count * 1.4));
+    navigationScore = Math.min(12, Math.round(features.back_navigation_count * 1.2));
     contributingFactors.push({
-      factor: 'Erratic Question Navigation',
+      factor: 'Non-linear Question Navigation',
       points: navigationScore,
       explanation: `Elevated question jumping (${features.question_navigation_count} transitions, ${features.back_navigation_count} back-steps)`,
-      severity: 'medium',
+      severity: 'low',
       featureName: 'back_navigation_count',
       sessionValue: `${features.question_navigation_count} hops (${features.back_navigation_count} back)`,
       baselineValue: '5–25 hops (≤ 6 back)',
     });
-    detectedPatterns.push('Non-linear or scanning question navigation pattern');
+    detectedPatterns.push('Frequent non-linear question navigation sequence');
   }
 
+  // 6. Mouse Immobility
   let mouseIdleScore = 0;
   if (features.mouse_activity_score < 15 && features.session_duration > 120) {
-    mouseIdleScore = 10;
+    mouseIdleScore = 8;
     contributingFactors.push({
       factor: 'Prolonged Cursor Immobility',
-      points: 10,
+      points: 8,
       explanation: `Very low mouse dynamics index (${features.mouse_activity_score}/100) with ${features.mouse_idle_time}s idle cursor`,
       severity: 'low',
       featureName: 'mouse_activity_score',
       sessionValue: `${features.mouse_activity_score}/100`,
       baselineValue: '25–75/100',
     });
-    detectedPatterns.push('Atypical lack of cursor movement while viewing test content');
+    detectedPatterns.push('Extended lack of cursor movement while viewing test content');
   }
 
-  // Weight Isolation Forest anomaly probability
-  // mlScore in [0, 1]. Baseline normal is ~0.3 - 0.45. Above 0.65 is anomalous.
-  const mlWeightedPoints = Math.round(Math.max(0, (mlScore - 0.4) * 35));
-  if (mlWeightedPoints > 6) {
+  // 7. Isolation Forest Multivariate Vector Anomaly
+  const mlWeightedPoints = Math.round(Math.max(0, (mlScore - 0.4) * 30));
+  if (mlWeightedPoints > 5) {
     contributingFactors.push({
-      factor: 'Multivariate Behavioral Biometric Vector Anomaly',
+      factor: 'Multivariate Behavioral Biometric Anomaly',
       points: mlWeightedPoints,
       explanation: `Isolation Forest ensemble detected structural deviation across 14 biometric dimensions (raw anomaly score ${(mlScore * 100).toFixed(1)}%)`,
-      severity: mlWeightedPoints > 15 ? 'high' : 'medium',
+      severity: mlWeightedPoints > 14 ? 'high' : 'medium',
       featureName: 'isolation_forest_vector',
       sessionValue: `${(mlScore * 100).toFixed(1)}% anomaly probability`,
       baselineValue: '< 45.0%',
     });
-    detectedPatterns.push('Multivariate behavioral vector deviated from trained baseline');
+    detectedPatterns.push('Multivariate interaction vector deviated from baseline population distribution');
   }
 
-  // Aggregate final risk score (clamped to 0 - 100)
-  const rawSum = focusScore + copyPasteScore + timingScore + navigationScore + mouseIdleScore + mlWeightedPoints;
+  // Aggregate final risk score (0-100)
+  const rawSum = focusScore + copyPasteScore + codingScore + timingScore + navigationScore + mouseIdleScore + mlWeightedPoints;
   const finalRiskScore = Math.min(100, Math.max(0, Math.round(rawSum)));
 
-  // Categorize
+  // Categorize risk level
   let riskLevel: RiskLevel = 'NORMAL';
-  let recommendation = 'Exam interactions are consistent with baseline expectations. No action required.';
+  let recommendation = 'Exam interactions are consistent with baseline expectations. No proctor intervention needed.';
 
   if (finalRiskScore >= 75) {
     riskLevel = 'HIGH_ANOMALY';
     recommendation =
-      'High behavioral anomaly detected. Human examiner review recommended. Inspect timeline events and focus loss logs.';
+      'Multiple significant behavioral deviations detected. Detailed human examiner review recommended. Inspect forensic event timeline.';
   } else if (finalRiskScore >= 55) {
     riskLevel = 'REVIEW';
     recommendation =
-      'Moderate behavioral deviation detected. Secondary examiner check recommended to verify navigation and interaction context.';
+      'Several behavioral deviations observed. Human review recommended to evaluate contextual interaction.';
   } else if (finalRiskScore >= 30) {
     riskLevel = 'LOW_CONCERN';
     recommendation =
@@ -464,7 +595,7 @@ export function calculateExplainableRisk(
   }
 
   if (detectedPatterns.length === 0) {
-    detectedPatterns.push('Normal steady pacing and consistent exam focus');
+    detectedPatterns.push('Consistent exam focus and typical incremental pacing');
   }
 
   return {
@@ -474,6 +605,9 @@ export function calculateExplainableRisk(
     riskScore: finalRiskScore,
     riskLevel,
     modelUsed,
+    modelVersion: 'behavioral-iforest-v2',
+    featureSchemaVersion: 'behavior-v2',
+    scoringVersion: 'risk-v2',
     detectedPatterns,
     contributingFactors,
     recommendation,
@@ -498,40 +632,45 @@ export function getBaselineFeatureComparison(
     'mouse_idle_time',
     'question_navigation_count',
     'back_navigation_count',
+    'large_insertion_count',
+    'code_run_count',
+    'coding_focus_loss_count',
   ];
 
-  return keys.map((key) => {
-    const meta = BEHAVIORAL_BASELINE[key];
-    const val = features[key];
-    let status: 'normal' | 'moderate' | 'deviated' = 'normal';
+  return keys
+    .filter((key) => BEHAVIORAL_BASELINE[key] !== undefined)
+    .map((key) => {
+      const meta = BEHAVIORAL_BASELINE[key];
+      const val = (features[key] ?? 0) as number;
+      let status: 'normal' | 'moderate' | 'deviated' = 'normal';
 
-    if (key === 'copy_count' || key === 'paste_count') {
-      status = val > 0 ? 'deviated' : 'normal';
-    } else if (key === 'focus_loss_count') {
-      status = val > 4 ? 'deviated' : val > 2 ? 'moderate' : 'normal';
-    } else if (key === 'focus_loss_duration') {
-      status = val > 15 ? 'deviated' : val > 6 ? 'moderate' : 'normal';
-    } else if (val < meta.min || val > meta.max) {
-      const distance = Math.abs(val - meta.mean) / Math.max(1, meta.std);
-      status = distance > 2.5 ? 'deviated' : 'moderate';
-    }
+      if (key === 'copy_count' || key === 'paste_count' || key === 'large_insertion_count') {
+        status = val > 0 ? 'deviated' : 'normal';
+      } else if (key === 'focus_loss_count' || key === 'coding_focus_loss_count') {
+        status = val > 3 ? 'deviated' : val > 1 ? 'moderate' : 'normal';
+      } else if (key === 'focus_loss_duration') {
+        status = val > 15 ? 'deviated' : val > 6 ? 'moderate' : 'normal';
+      } else if (val < meta.min || val > meta.max) {
+        const distance = Math.abs(val - meta.mean) / Math.max(1, meta.std);
+        status = distance > 2.2 ? 'deviated' : 'moderate';
+      }
 
-    const zScore = Math.round(((val - meta.mean) / Math.max(0.1, meta.std)) * 10) / 10;
+      const zScore = Math.round(((val - meta.mean) / Math.max(0.1, meta.std)) * 10) / 10;
 
-    return {
-      featureName: meta.label || key,
-      label: meta.label,
-      baseline: `${meta.min}–${meta.max} ${meta.unit}`,
-      session: `${val} ${meta.unit}`,
-      baselineMin: meta.min,
-      baselineMax: meta.max,
-      baselineMean: meta.mean,
-      baselineStd: meta.std,
-      sessionVal: val,
-      sessionValue: `${val} ${meta.unit}`,
-      zScore,
-      status,
-      unit: meta.unit,
-    };
-  });
+      return {
+        featureName: meta.label || key,
+        label: meta.label,
+        baseline: `${meta.min}–${meta.max} ${meta.unit}`,
+        session: `${val} ${meta.unit}`,
+        baselineMin: meta.min,
+        baselineMax: meta.max,
+        baselineMean: meta.mean,
+        baselineStd: meta.std,
+        sessionVal: val,
+        sessionValue: `${val} ${meta.unit}`,
+        zScore,
+        status,
+        unit: meta.unit,
+      };
+    });
 }
