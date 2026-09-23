@@ -1,0 +1,6 @@
+{
+  "name": "SmartExam AI - ED-02 Anomaly Detection",
+  "description": "Privacy-preserving AI examination & behavioral anomaly detection platform using behavioral biometrics, non-invasive telemetry, and explainable risk scoring.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
