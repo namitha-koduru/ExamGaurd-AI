@@ -32,37 +32,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (storedToken) {
         try {
           const res = await api.getMe();
-          setUser(res.user);
+          if (res && res.user) {
+            setUser(res.user);
+            setToken(storedToken);
+          } else {
+            logout();
+          }
         } catch {
-          await authenticateDefaultStudent();
+          logout();
         }
-      } else {
-        await authenticateDefaultStudent();
       }
       setIsLoading(false);
     }
 
     initUser();
   }, []);
-
-  const authenticateDefaultStudent = async () => {
-    try {
-      const res = await api.login('alex.student@smartexam.edu', 'password123');
-      setUser(res.user);
-      setToken(res.token);
-      localStorage.setItem('examguard_token', res.token);
-    } catch {
-      // Fallback in case backend is initializing
-      const studentUser: User = {
-        id: 'usr-student-1',
-        name: 'Alex Rivera',
-        email: 'alex.student@smartexam.edu',
-        role: 'STUDENT',
-        createdAt: '2026-09-01T08:00:00Z',
-      };
-      setUser(studentUser);
-    }
-  };
 
   const login = async (email: string, pass: string) => {
     const res = await api.login(email, pass);
@@ -92,7 +76,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } else if (targetRole === 'EXAMINER') {
         await login('elena.examiner@smartexam.edu', 'password123');
       } else {
-        await login('admin@smartexam.edu', 'password123');
+        await login('examiner@university.edu', 'password123');
       }
     } catch (err) {
       console.warn('Role switch login error:', err);

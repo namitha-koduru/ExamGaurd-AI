@@ -86,6 +86,8 @@ export interface Exam {
   startTime: string;
   endTime: string;
   createdAt: string;
+  accessCode?: string; // The teacher-provided exam key, e.g. A7K9-XP2
+  isPublished?: boolean;
   settings?: ExamSettings;
   questionDistribution?: {
     mcq: number;
@@ -256,6 +258,19 @@ export interface ExamSession {
   status: 'ACTIVE' | 'SUBMITTED' | 'EXPIRED';
   answers: Record<string, any>; // questionId -> value (number for MCQ, string for Descriptive, object for Coding)
   progress: number; // percentage 0 - 100
+  score?: number;
+  maxScore?: number;
+  scorePercentage?: number;
+  gradingBreakdown?: {
+    questionId: string;
+    questionTitle: string;
+    questionType: QuestionType;
+    marksAwarded: number;
+    maxMarks: number;
+    isCorrect?: boolean;
+    feedback?: string;
+  }[];
+  accessCodeUsed?: string;
   riskScore: number;
   riskLevel: RiskLevel;
   anomalyReport?: AnomalyReport;

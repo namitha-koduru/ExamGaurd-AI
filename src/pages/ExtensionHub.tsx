@@ -7,14 +7,14 @@ export const ExtensionHub: React.FC = () => {
   const manifestJsonString = JSON.stringify(
     {
       manifest_version: 3,
-      name: 'SmartExam AI Monitor',
+      name: 'ExamGuard AI Monitor',
       version: '1.2.0',
       description: 'Privacy-preserving behavioral interaction sensor for secure online examinations.',
       permissions: ['activeTab', 'storage'],
       host_permissions: ['http://localhost:3000/*', 'http://127.0.0.1:3000/*'],
       action: {
         default_popup: 'src/popup/popup.html',
-        default_title: 'SmartExam AI Monitor Status',
+        default_title: 'ExamGuard AI Monitor Status',
       },
       background: {
         service_worker: 'src/background/service-worker.js',
@@ -46,7 +46,7 @@ export const ExtensionHub: React.FC = () => {
           <span>Chrome Extension Manifest V3</span>
         </div>
         <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
-          SmartExam AI Browser Extension Package
+          ExamGuard AI Browser Extension Package
         </h1>
         <p className="text-xs text-slate-500 mt-1 max-w-2xl leading-relaxed">
           The SmartExam client extension acts as a lightweight, non-invasive telemetry sensor that measures client-side

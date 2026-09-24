@@ -5,12 +5,14 @@ import { Check, AlertCircle, ShieldCheck, Clock, FileText, ArrowRight, ArrowLeft
 
 interface ExamInstructionsProps {
   exam: Exam;
+  accessCode?: string;
   onBack: () => void;
-  onStartExam: (examId: string) => void;
+  onStartExam: (examId: string, accessCode?: string) => void;
 }
 
 export const ExamInstructions: React.FC<ExamInstructionsProps> = ({
   exam,
+  accessCode,
   onBack,
   onStartExam,
 }) => {
@@ -52,7 +54,7 @@ export const ExamInstructions: React.FC<ExamInstructionsProps> = ({
   const handleStart = async () => {
     setStarting(true);
     try {
-      await onStartExam(exam.id);
+      await onStartExam(exam.id, accessCode);
     } catch (err) {
       console.error('Failed to start exam:', err);
       setStarting(false);

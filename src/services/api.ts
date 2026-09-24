@@ -109,13 +109,39 @@ export const api = {
     if (!res.ok) throw new Error('Failed to delete examination');
   },
 
+  // Exam Code Validation & Single-Attempt Check
+  async validateExamCode(
+    examId: string,
+    code: string
+  ): Promise<{
+    valid: boolean;
+    status: 'VALID' | 'INVALID_CODE' | 'EXPIRED' | 'NOT_STARTED' | 'ALREADY_ATTEMPTED' | 'NOT_FOUND';
+    message: string;
+    exam?: Partial<Exam>;
+    existingSessionId?: string;
+  }> {
+    const res = await fetch(`${API_BASE}/exams/${examId}/validate-code`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ code }),
+    });
+    return res.json();
+  },
+
   // Exam Sessions
-  async startExam(examId: string): Promise<{ session: ExamSession; handshakeToken?: string }> {
+  async startExam(
+    examId: string,
+    accessCode?: string
+  ): Promise<{ session: ExamSession; handshakeToken?: string }> {
     const res = await fetch(`${API_BASE}/exams/${examId}/start`, {
       method: 'POST',
       headers: getAuthHeaders(),
+      body: JSON.stringify({ accessCode }),
     });
-    if (!res.ok) throw new Error('Failed to initialize exam session');
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || err.message || 'Failed to initialize exam session');
+    }
     return res.json();
   },
 

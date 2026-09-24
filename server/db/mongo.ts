@@ -27,6 +27,32 @@ let isConnectedToAtlas = false;
 // -------------------------------------------------------------
 // In-Memory Database Fallback Store (Used when MONGODB_URI is offline/not set)
 // -------------------------------------------------------------
+function matchDoc(item: any, query: any): boolean {
+  if (!query || Object.keys(query).length === 0) return true;
+  if (query.$or && Array.isArray(query.$or)) {
+    const matched = query.$or.some((sub: any) => matchDoc(item, sub));
+    if (!matched) return false;
+  }
+  for (const key of Object.keys(query)) {
+    if (key === '$or') continue;
+    const expected = query[key];
+    const actual = item[key];
+    if (expected !== undefined) {
+      if (typeof expected === 'object' && expected !== null) {
+        if (expected.$regex && !new RegExp(expected.$regex, expected.$options || '').test(String(actual))) {
+          return false;
+        }
+        if (expected.$in && Array.isArray(expected.$in) && !expected.$in.includes(actual)) {
+          return false;
+        }
+      } else if (actual !== expected) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
 class InMemoryCollection<T extends { id?: string; _id?: any }> {
   private items = new Map<string, T>();
 
@@ -35,14 +61,9 @@ class InMemoryCollection<T extends { id?: string; _id?: any }> {
   async find(query: any = {}): Promise<{ toArray: () => Promise<T[]> }> {
     const results: T[] = [];
     for (const item of this.items.values()) {
-      let matches = true;
-      for (const key of Object.keys(query)) {
-        if (query[key] !== undefined && (item as any)[key] !== query[key]) {
-          matches = false;
-          break;
-        }
+      if (matchDoc(item, query)) {
+        results.push({ ...item });
       }
-      if (matches) results.push({ ...item });
     }
     return {
       toArray: async () => results,
@@ -51,24 +72,9 @@ class InMemoryCollection<T extends { id?: string; _id?: any }> {
 
   async findOne(query: any): Promise<T | null> {
     for (const item of this.items.values()) {
-      let matches = true;
-      for (const key of Object.keys(query)) {
-        const expected = query[key];
-        const actual = (item as any)[key];
-        if (expected !== undefined) {
-          if (typeof expected === 'object' && expected !== null) {
-            // simple $regex or $in
-            if (expected.$regex && !new RegExp(expected.$regex, expected.$options || '').test(String(actual))) {
-              matches = false;
-              break;
-            }
-          } else if (actual !== expected) {
-            matches = false;
-            break;
-          }
-        }
+      if (matchDoc(item, query)) {
+        return { ...item };
       }
-      if (matches) return { ...item };
     }
     return null;
   }
@@ -314,6 +320,8 @@ async function seedDatabase() {
       totalQuestions: 4,
       status: 'ACTIVE',
       createdBy: 'Dr. Sarah Jenkins',
+      accessCode: 'A7K9-XP2',
+      isPublished: true,
       startTime: new Date(Date.now() - 3600000).toISOString(),
       endTime: new Date(Date.now() + 86400000 * 5).toISOString(),
       createdAt: new Date().toISOString(),

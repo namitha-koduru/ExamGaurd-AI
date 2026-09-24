@@ -11,7 +11,7 @@ import {
   calculateExplainableRisk,
   getBaselineFeatureComparison,
 } from '../../src/ml/isolationForest';
-import { ExamSession, BehaviorEvent } from '../../src/types';
+import { ExamSession, BehaviorEvent, Question } from '../../src/types';
 
 const router = Router();
 
@@ -129,12 +129,84 @@ router.post('/:id/submit', async (req, res) => {
     const anomalyReport = calculateExplainableRisk(features, true);
     anomalyReport.sessionId = req.params.id;
 
+    // Calculate academic scores across questions
+    const qCursor = await db.questions().find({ examId: session.examId });
+    const questions: Question[] = await qCursor.toArray();
+
+    let totalScore = 0;
+    let maxPossibleScore = 0;
+    const gradingBreakdown: any[] = [];
+
+    for (const q of questions) {
+      const qMarks = q.marks || 10;
+      maxPossibleScore += qMarks;
+      const studentAns = finalAnswers[q.id];
+      let marksAwarded = 0;
+      let isCorrect = false;
+      let feedback = '';
+
+      if (q.questionType === 'MULTIPLE_CHOICE') {
+        if (studentAns !== undefined && studentAns !== null && Number(studentAns) === q.correctAnswer) {
+          marksAwarded = qMarks;
+          isCorrect = true;
+          feedback = 'Correct option selected';
+        } else {
+          marksAwarded = 0;
+          feedback = 'Incorrect option selected';
+        }
+      } else if (q.questionType === 'CODING') {
+        const codingSub = (session.codingSubmissions && session.codingSubmissions[q.id]) || (studentAns && typeof studentAns === 'object' ? studentAns : null);
+        if (codingSub) {
+          const passed = codingSub.passedTests ?? 0;
+          const total = codingSub.totalTests ?? (q.testCases?.length || 1);
+          if (total > 0) {
+            marksAwarded = Math.round((passed / total) * qMarks);
+            isCorrect = passed === total && total > 0;
+            feedback = `${passed} of ${total} test cases passed`;
+          }
+        } else {
+          marksAwarded = 0;
+          feedback = 'No code submitted';
+        }
+      } else if (q.questionType === 'DESCRIPTIVE') {
+        const text = typeof studentAns === 'string' ? studentAns.trim() : '';
+        const words = text ? text.split(/\s+/).filter(Boolean).length : 0;
+        if (words >= (q.minWords || 20)) {
+          marksAwarded = Math.round(qMarks * 0.85); // 85% provisional marks
+          feedback = `Substantive response provided (${words} words). Provisional score pending manual review.`;
+        } else if (words > 0) {
+          marksAwarded = Math.round(qMarks * 0.5);
+          feedback = `Brief response (${words} words, under recommended min). Provisional score.`;
+        } else {
+          marksAwarded = 0;
+          feedback = 'No response written';
+        }
+      }
+
+      totalScore += marksAwarded;
+      gradingBreakdown.push({
+        questionId: q.id,
+        questionTitle: q.title || `Question`,
+        questionType: q.questionType,
+        marksAwarded,
+        maxMarks: qMarks,
+        isCorrect,
+        feedback,
+      });
+    }
+
+    const scorePercentage = maxPossibleScore > 0 ? Math.round((totalScore / maxPossibleScore) * 100) : 0;
+
     const finalSessionData = {
       answers: finalAnswers,
       progress: 100,
       submittedAt,
       durationSeconds,
       status: 'SUBMITTED' as const,
+      score: totalScore,
+      maxScore: maxPossibleScore,
+      scorePercentage,
+      gradingBreakdown,
       features,
       riskScore: anomalyReport.riskScore,
       riskLevel: anomalyReport.riskLevel,
@@ -165,6 +237,9 @@ router.post('/:id/submit', async (req, res) => {
       sessionId: req.params.id,
       studentName: session.studentName,
       examTitle: session.examTitle,
+      score: totalScore,
+      maxScore: maxPossibleScore,
+      scorePercentage,
       riskScore: anomalyReport.riskScore,
       riskLevel: anomalyReport.riskLevel,
       submittedAt,

@@ -14,15 +14,15 @@ export const PrivacyPage: React.FC = () => {
           Privacy-Preserving Examination Intelligence
         </h1>
         <p className="text-xs text-slate-500 mt-1 max-w-2xl leading-relaxed">
-          SmartExam AI is built on the fundamental premise: <strong>Detect behavior, not the person.</strong>
+          ExamGuard AI is built on the fundamental premise: <strong>Detect behavior, not the person.</strong>
           We believe high-stakes academic integrity should never require invasive home surveillance or biometric profiling.
         </p>
       </div>
 
-      {/* Comparison Matrix: Invasive vs SmartExam */}
+      {/* Comparison Matrix: Invasive vs ExamGuard AI */}
       <div className="space-y-4">
         <h2 className="text-sm font-semibold text-slate-900 dark:text-white">
-          Architectural Comparison: Conventional Proctoring vs SmartExam AI
+          Architectural Comparison: Conventional Proctoring vs ExamGuard AI
         </h2>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
@@ -56,11 +56,11 @@ export const PrivacyPage: React.FC = () => {
             </ul>
           </div>
 
-          {/* SmartExam AI */}
+          {/* ExamGuard AI */}
           <div className="bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/50 rounded-lg p-5 space-y-3">
             <div className="flex items-center gap-2 font-semibold text-emerald-900 dark:text-emerald-300 text-sm">
               <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-              <span>SmartExam AI Non-Invasive Approach</span>
+              <span>ExamGuard AI Non-Invasive Approach</span>
             </div>
             <ul className="space-y-2 text-emerald-800/90 dark:text-emerald-300/80 text-[11px]">
               <li className="flex items-start gap-2">

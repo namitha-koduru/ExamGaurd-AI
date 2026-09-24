@@ -23,6 +23,8 @@ import {
   Terminal,
   Cpu,
   Shield,
+  Award,
+  Key,
 } from 'lucide-react';
 
 interface SessionDetailProps {
@@ -36,7 +38,7 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
   const [anomalyReport, setAnomalyReport] = useState<AnomalyReport | null>(null);
   const [featureComparison, setFeatureComparison] = useState<BaselineFeatureComparison[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [activeTab, setActiveTab] = useState<'comparison' | 'explanation' | 'timeline' | 'coding'>('comparison');
+  const [activeTab, setActiveTab] = useState<'results' | 'comparison' | 'explanation' | 'coding' | 'timeline'>('results');
 
   // Proctor review form
   const [proctorStatus, setProctorStatus] = useState<'UNREVIEWED' | 'REVIEWED' | 'FLAGGED'>('UNREVIEWED');
@@ -163,55 +165,177 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
       </div>
 
       {/* Forensic Tabs */}
-      <div className="border-b border-slate-200 dark:border-slate-800 flex gap-2">
+      <div className="border-b border-slate-200 dark:border-slate-800 flex gap-2 overflow-x-auto pb-1">
         <button
-          onClick={() => setActiveTab('comparison')}
-          className={`pb-2.5 px-3 text-xs font-medium border-b-2 transition-colors flex items-center gap-1.5 ${
-            activeTab === 'comparison'
-              ? 'border-slate-900 text-slate-900 dark:border-white dark:text-white font-semibold'
-              : 'border-transparent text-slate-500 hover:text-slate-800'
+          onClick={() => setActiveTab('results')}
+          className={`pb-2.5 px-3 text-xs font-medium border-b-2 transition-colors flex items-center gap-1.5 whitespace-nowrap ${
+            activeTab === 'results'
+              ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400 font-bold'
+              : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
           }`}
         >
-          <Layers className="w-3.5 h-3.5" />
-          Baseline Comparison
+          <Award className="w-3.5 h-3.5" />
+          Academic Results & Scoring
         </button>
 
         <button
           onClick={() => setActiveTab('explanation')}
-          className={`pb-2.5 px-3 text-xs font-medium border-b-2 transition-colors flex items-center gap-1.5 ${
+          className={`pb-2.5 px-3 text-xs font-medium border-b-2 transition-colors flex items-center gap-1.5 whitespace-nowrap ${
             activeTab === 'explanation'
-              ? 'border-slate-900 text-slate-900 dark:border-white dark:text-white font-semibold'
-              : 'border-transparent text-slate-500 hover:text-slate-800'
+              ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400 font-bold'
+              : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
           }`}
         >
           <Activity className="w-3.5 h-3.5" />
-          Explainability & Attribution
+          Malpractice Risk & Attribution
+        </button>
+
+        <button
+          onClick={() => setActiveTab('comparison')}
+          className={`pb-2.5 px-3 text-xs font-medium border-b-2 transition-colors flex items-center gap-1.5 whitespace-nowrap ${
+            activeTab === 'comparison'
+              ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400 font-bold'
+              : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+          }`}
+        >
+          <Layers className="w-3.5 h-3.5" />
+          Baseline Biometrics
         </button>
 
         <button
           onClick={() => setActiveTab('coding')}
-          className={`pb-2.5 px-3 text-xs font-medium border-b-2 transition-colors flex items-center gap-1.5 ${
+          className={`pb-2.5 px-3 text-xs font-medium border-b-2 transition-colors flex items-center gap-1.5 whitespace-nowrap ${
             activeTab === 'coding'
-              ? 'border-slate-900 text-slate-900 dark:border-white dark:text-white font-semibold'
-              : 'border-transparent text-slate-500 hover:text-slate-800'
+              ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400 font-bold'
+              : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
           }`}
         >
           <Code2 className="w-3.5 h-3.5" />
-          Coding Forensics
+          Coding Forensics & Submissions
         </button>
 
         <button
           onClick={() => setActiveTab('timeline')}
-          className={`pb-2.5 px-3 text-xs font-medium border-b-2 transition-colors flex items-center gap-1.5 ${
+          className={`pb-2.5 px-3 text-xs font-medium border-b-2 transition-colors flex items-center gap-1.5 whitespace-nowrap ${
             activeTab === 'timeline'
-              ? 'border-slate-900 text-slate-900 dark:border-white dark:text-white font-semibold'
-              : 'border-transparent text-slate-500 hover:text-slate-800'
+              ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400 font-bold'
+              : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
           }`}
         >
           <Clock className="w-3.5 h-3.5" />
           Event Timeline ({timeline.length})
         </button>
       </div>
+
+      {/* Tab 0: Academic Results & Question Scoring */}
+      {activeTab === 'results' && (
+        <div className="space-y-4">
+          {/* Summary Score Card */}
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <span className="text-[10px] text-slate-400 uppercase tracking-widest font-semibold">
+                Official Examination Evaluation
+              </span>
+              <h2 className="text-base font-bold text-slate-900 dark:text-white">
+                Candidate Score Breakdown & Paper Review
+              </h2>
+              <div className="text-xs text-slate-500 flex items-center gap-3 pt-1">
+                <span>Access Key Used: <strong className="font-mono text-indigo-600 dark:text-indigo-400">{session.accessCodeUsed || 'A7K9-XP2'}</strong></span>
+                <span>•</span>
+                <span>Time Taken: <strong className="font-mono">{Math.round((session.durationSeconds || 0) / 60)} minutes</strong></span>
+              </div>
+            </div>
+
+            <div className="bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 rounded-xl p-4 text-center shrink-0">
+              <span className="text-[10px] uppercase tracking-wider text-indigo-600 dark:text-indigo-400 font-bold block">
+                Total Score
+              </span>
+              <div className="text-3xl font-black font-mono text-slate-900 dark:text-white mt-0.5">
+                {session.score !== undefined ? session.score : 0}
+                <span className="text-base text-slate-400 font-normal"> / {session.maxScore || 50}</span>
+              </div>
+              <span className="text-xs font-semibold text-indigo-700 dark:text-indigo-300 font-mono">
+                {session.scorePercentage ?? (session.maxScore ? Math.round(((session.score || 0) / session.maxScore) * 100) : 0)}%
+              </span>
+            </div>
+          </div>
+
+          {/* Question-by-Question Grading */}
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-xs space-y-4">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">
+              Question Answers & Rubric Assessment
+            </h3>
+
+            {session.gradingBreakdown && session.gradingBreakdown.length > 0 ? (
+              <div className="space-y-3">
+                {session.gradingBreakdown.map((item, idx) => (
+                  <div
+                    key={idx}
+                    className="p-4 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 space-y-2 text-xs"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-slate-900 dark:text-white">
+                          Question {idx + 1}: {item.questionTitle}
+                        </span>
+                        <span className="px-2 py-0.5 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded text-[10px] font-mono">
+                          {item.questionType}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2 py-0.5 rounded text-[11px] font-bold font-mono ${
+                          item.marksAwarded === item.maxMarks
+                            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
+                            : item.marksAwarded > 0
+                            ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300'
+                            : 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300'
+                        }`}>
+                          {item.marksAwarded} / {item.maxMarks} Marks
+                        </span>
+                      </div>
+                    </div>
+
+                    <p className="text-[11px] text-slate-600 dark:text-slate-400">
+                      {item.feedback || (item.isCorrect ? 'Correct submission' : 'Partial / uncredited response')}
+                    </p>
+
+                    {/* Candidate's submitted answer details */}
+                    {session.answers && session.answers[item.questionId] !== undefined && (
+                      <div className="mt-2 pt-2 border-t border-slate-200 dark:border-slate-800 text-[11px]">
+                        <span className="text-slate-400 font-semibold block mb-1">Candidate's Response:</span>
+                        {typeof session.answers[item.questionId] === 'object' && session.answers[item.questionId].code ? (
+                          <pre className="p-3 bg-slate-950 text-slate-200 font-mono text-[11px] rounded overflow-x-auto">
+                            {session.answers[item.questionId].code}
+                          </pre>
+                        ) : typeof session.answers[item.questionId] === 'string' ? (
+                          <p className="bg-white dark:bg-slate-800 p-2.5 rounded border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 whitespace-pre-wrap">
+                            {session.answers[item.questionId]}
+                          </p>
+                        ) : (
+                          <div className="font-mono text-slate-700 dark:text-slate-300">
+                            Selected Option Index: <strong>{String(session.answers[item.questionId])}</strong>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {Object.entries(session.answers || {}).map(([qId, ans]: [string, any], idx) => (
+                  <div key={qId} className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded border border-slate-200 dark:border-slate-700 text-xs">
+                    <span className="font-semibold text-slate-800 dark:text-slate-200">Question {idx + 1} ({qId})</span>
+                    <div className="mt-1 font-mono text-[11px] text-slate-600 dark:text-slate-400">
+                      {typeof ans === 'object' ? JSON.stringify(ans) : String(ans)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Tab 1: Baseline Feature Comparison */}
       {activeTab === 'comparison' && (
