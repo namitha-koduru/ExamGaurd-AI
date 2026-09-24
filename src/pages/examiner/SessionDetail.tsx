@@ -1,6 +1,6 @@
 /**
  * ExamGuard AI - Session Forensics & Proctor Inspector
- * ED-02 — AI-Based Exam Malpractice Detection
+ * Institutional Examination Platform & Behavioral Intelligence
  * Detect Behavior, Not the Person
  */
 
@@ -187,7 +187,7 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
           }`}
         >
           <Activity className="w-3.5 h-3.5" />
-          Malpractice Risk & Attribution
+          Behavioral Risk & Attribution
         </button>
 
         <button

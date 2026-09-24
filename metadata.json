@@ -1,6 +1,6 @@
 {
-  "name": "SmartExam AI - ED-02 Anomaly Detection",
-  "description": "Privacy-preserving AI examination & behavioral anomaly detection platform using behavioral biometrics, non-invasive telemetry, and explainable risk scoring.",
+  "name": "ExamGuard AI - Institutional Examination Platform",
+  "description": "ExamGuard AI is an institutional examination platform that enables educational organizations to create, schedule, conduct, evaluate, and monitor secure online examinations with privacy-conscious behavioral intelligence.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

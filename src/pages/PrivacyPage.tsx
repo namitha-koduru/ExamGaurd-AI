@@ -51,7 +51,7 @@ export const PrivacyPage: React.FC = () => {
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-rose-500 font-bold shrink-0">✕</span>
-                <span>Automated false accusations ("student flagged as cheating")</span>
+                <span>Automated punitive accusations without human examiner review</span>
               </li>
             </ul>
           </div>

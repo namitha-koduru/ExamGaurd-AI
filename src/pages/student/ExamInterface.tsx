@@ -1,6 +1,6 @@
 /**
  * ExamGuard AI - Student Examination Interface
- * ED-02 — AI-Based Exam Malpractice Detection
+ * Institutional Examination Platform & Behavioral Intelligence
  * Detect Behavior, Not the Person
  */
 

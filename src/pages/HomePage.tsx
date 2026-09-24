@@ -1,6 +1,6 @@
 /**
  * ExamGuard AI - Official Institutional Home Page
- * ED-02 — AI-Based Exam Malpractice Detection
+ * Institutional Examination Platform & Behavioral Intelligence
  * Professional, Dignified Academic Integrity Platform
  */
 
@@ -40,7 +40,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
           <div className="max-w-3xl space-y-6">
             <div className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-indigo-700 dark:text-indigo-400">
               <span className="w-2 h-2 rounded-full bg-indigo-600 dark:bg-indigo-400"></span>
-              <span>Institutional Malpractice Detection Platform · ED-02 Standard</span>
+              <span>Institutional Examination Platform · Multi-Tenant Architecture</span>
             </div>
 
             <h1 className="text-3xl sm:text-5xl font-black text-slate-900 dark:text-white tracking-tight leading-[1.15]">
@@ -48,7 +48,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
             </h1>
 
             <p className="text-base sm:text-lg text-slate-600 dark:text-slate-300 leading-relaxed font-normal">
-              ExamGuard AI verifies test-taker authenticity and detects unfair practice through privacy-preserving interaction dynamics. No webcam recording, no facial recognition, and no invasive desktop intrusion.
+              ExamGuard AI is an institutional examination platform that enables educational organizations to create, schedule, conduct, evaluate, and monitor secure online examinations with privacy-conscious behavioral intelligence.
             </p>
 
             {/* Primary Action Buttons */}
@@ -338,7 +338,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
           <div className="flex items-center gap-2">
             <span className="font-bold text-slate-900 dark:text-white">ExamGuard AI</span>
             <span>·</span>
-            <span>ED-02 Examination Integrity Standard</span>
+            <span>Institutional Examination & Integrity Standard</span>
           </div>
 
           <div className="flex items-center gap-6">

@@ -7,6 +7,7 @@
 import { MongoClient, Db, Collection } from 'mongodb';
 import bcrypt from 'bcryptjs';
 import {
+  Institution,
   User,
   Exam,
   Question,
@@ -142,6 +143,7 @@ class InMemoryCollection<T extends { id?: string; _id?: any }> {
 
 // In-Memory collections table
 const inMemoryStore = {
+  institutions: new InMemoryCollection<Institution>('institutions'),
   users: new InMemoryCollection<User & { passwordHash?: string }>('users'),
   exams: new InMemoryCollection<Exam>('exams'),
   questions: new InMemoryCollection<Question>('questions'),
@@ -168,9 +170,12 @@ export async function initMongo(): Promise<boolean> {
       console.log(`[MongoDB] Connected successfully to database: ${DB_NAME}`);
 
       // Ensure indexes
+      await dbInstance.collection('institutions').createIndex({ registrationId: 1 }, { unique: true });
       await dbInstance.collection('users').createIndex({ email: 1 }, { unique: true });
       await dbInstance.collection('sessions').createIndex({ examId: 1, studentId: 1 });
       await dbInstance.collection('sessions').createIndex({ status: 1 });
+      await dbInstance.collection('sessions').createIndex({ institutionId: 1 });
+      await dbInstance.collection('exams').createIndex({ institutionId: 1 });
       await dbInstance.collection('behavior_events').createIndex({ sessionId: 1, timestamp: 1 });
       await dbInstance.collection('coding_submissions').createIndex({ sessionId: 1, questionId: 1 });
       await dbInstance.collection('audit_logs').createIndex({ timestamp: -1 });
@@ -205,6 +210,7 @@ export function getDbCollection<T extends { id?: string; _id?: any }>(collection
 
 // Helper accessors
 export const db = {
+  institutions: () => getDbCollection<Institution>('institutions'),
   users: () => getDbCollection<User & { passwordHash?: string }>('users'),
   exams: () => getDbCollection<Exam>('exams'),
   questions: () => getDbCollection<Question>('questions'),
@@ -246,10 +252,103 @@ export async function checkDbHealth(): Promise<{
 async function seedDatabase() {
   const defaultHash = await bcrypt.hash('password123', 10);
 
-  // Seed Users
+  // Seed Recognizable Sandbox Institutions (clearly designated as sample/sandbox for testing)
+  const seedInstitutions: Institution[] = [
+    {
+      id: 'inst-vignan',
+      name: 'Vignan University',
+      registrationId: 'VIGNAN-UNIV-DEMO',
+      type: 'University',
+      country: 'India',
+      domain: 'vignan.ac.in',
+      adminName: 'Prof. K. Ramamurthy',
+      adminEmail: 'registrar@vignan.ac.in',
+      status: 'ACTIVE',
+      isSampleSandbox: true,
+      createdAt: new Date().toISOString(),
+    },
+    {
+      id: 'inst-vit',
+      name: 'VIT',
+      registrationId: 'VIT-TECH-DEMO',
+      type: 'University',
+      country: 'India',
+      domain: 'vit.ac.in',
+      adminName: 'Dr. G. Viswanathan',
+      adminEmail: 'examinations@vit.ac.in',
+      status: 'ACTIVE',
+      isSampleSandbox: true,
+      createdAt: new Date().toISOString(),
+    },
+    {
+      id: 'inst-srm',
+      name: 'SRM Institute of Science and Technology',
+      registrationId: 'SRM-IST-DEMO',
+      type: 'University',
+      country: 'India',
+      domain: 'srmist.edu.in',
+      adminName: 'Dr. C. Muthamizhchelvan',
+      adminEmail: 'coe@srmist.edu.in',
+      status: 'ACTIVE',
+      isSampleSandbox: true,
+      createdAt: new Date().toISOString(),
+    },
+    {
+      id: 'inst-amrita',
+      name: 'Amrita Vishwa Vidyapeetham',
+      registrationId: 'AMRITA-VISHWA-DEMO',
+      type: 'University',
+      country: 'India',
+      domain: 'amrita.edu',
+      adminName: 'Dr. P. Venkat Rangan',
+      adminEmail: 'evaluations@amrita.edu',
+      status: 'ACTIVE',
+      isSampleSandbox: true,
+      createdAt: new Date().toISOString(),
+    },
+    {
+      id: 'inst-iith',
+      name: 'IIT Hyderabad',
+      registrationId: 'IITH-INST-DEMO',
+      type: 'University',
+      country: 'India',
+      domain: 'iith.ac.in',
+      adminName: 'Prof. B.S. Murty',
+      adminEmail: 'academics@iith.ac.in',
+      status: 'ACTIVE',
+      isSampleSandbox: true,
+      createdAt: new Date().toISOString(),
+    },
+    {
+      id: 'inst-uoh',
+      name: 'University of Hyderabad',
+      registrationId: 'UOH-CENTRAL-DEMO',
+      type: 'University',
+      country: 'India',
+      domain: 'uohyd.ac.in',
+      adminName: 'Prof. B.J. Rao',
+      adminEmail: 'coe@uohyd.ac.in',
+      status: 'ACTIVE',
+      isSampleSandbox: true,
+      createdAt: new Date().toISOString(),
+    },
+  ];
+
+  for (const inst of seedInstitutions) {
+    const existingInst = await db.institutions().findOne({ id: inst.id });
+    if (!existingInst) {
+      await db.institutions().insertOne(inst);
+    }
+  }
+
+  // Seed Users with Institution affiliations
   const seedUsers: (User & { passwordHash: string })[] = [
     {
       id: 'usr-examiner-1',
+      institutionId: 'inst-vit',
+      institutionName: 'VIT',
+      institutionRegistrationId: 'VIT-TECH-DEMO',
+      employeeId: 'FAC-VIT-041',
       name: 'Dr. Sarah Jenkins',
       email: 'examiner@university.edu',
       role: 'EXAMINER',
@@ -258,6 +357,10 @@ async function seedDatabase() {
     },
     {
       id: 'usr-examiner-2',
+      institutionId: 'inst-vignan',
+      institutionName: 'Vignan University',
+      institutionRegistrationId: 'VIGNAN-UNIV-DEMO',
+      employeeId: 'FAC-VU-882',
       name: 'Elena Rostova',
       email: 'elena.examiner@smartexam.edu',
       role: 'EXAMINER',
@@ -266,6 +369,10 @@ async function seedDatabase() {
     },
     {
       id: 'usr-student-1',
+      institutionId: 'inst-vignan',
+      institutionName: 'Vignan University',
+      institutionRegistrationId: 'VIGNAN-UNIV-DEMO',
+      studentId: 'VU-2023-CS-042',
       name: 'Alex Rivera',
       email: 'alex.student@smartexam.edu',
       role: 'STUDENT',
@@ -274,6 +381,10 @@ async function seedDatabase() {
     },
     {
       id: 'usr-student-alt',
+      institutionId: 'inst-vit',
+      institutionName: 'VIT',
+      institutionRegistrationId: 'VIT-TECH-DEMO',
+      studentId: 'VIT-2023-CSE-118',
       name: 'Alex Rivera',
       email: 'alex.rivera@student.edu',
       role: 'STUDENT',
@@ -282,6 +393,10 @@ async function seedDatabase() {
     },
     {
       id: 'usr-student-2',
+      institutionId: 'inst-srm',
+      institutionName: 'SRM Institute of Science and Technology',
+      institutionRegistrationId: 'SRM-IST-DEMO',
+      studentId: 'SRM-2024-AI-019',
       name: 'Maya Chen',
       email: 'maya.chen@student.edu',
       role: 'STUDENT',
@@ -290,6 +405,10 @@ async function seedDatabase() {
     },
     {
       id: 'usr-student-3',
+      institutionId: 'inst-vignan',
+      institutionName: 'Vignan University',
+      institutionRegistrationId: 'VIGNAN-UNIV-DEMO',
+      studentId: 'VU-2023-CS-089',
       name: 'Jordan Taylor',
       email: 'jordan.taylor@student.edu',
       role: 'STUDENT',
@@ -311,6 +430,8 @@ async function seedDatabase() {
   if (!existingExam) {
     const demoExam: Exam = {
       id: examId,
+      institutionId: 'inst-vignan',
+      institutionName: 'Vignan University',
       title: 'CS 301: Advanced Algorithms & Data Structures',
       courseCode: 'CS-301',
       description:
@@ -485,6 +606,8 @@ print(two_sum(nums, target))`,
     const completedSession: ExamSession = {
       id: 'sess-alex-completed',
       examId,
+      institutionId: 'inst-vignan',
+      institutionName: 'Vignan University',
       examTitle: 'CS 301: Advanced Algorithms & Data Structures',
       studentId: 'usr-student-1',
       studentName: 'Alex Rivera',
@@ -563,6 +686,8 @@ print(two_sum(nums, target))`,
     const anomalySession: ExamSession = {
       id: 'sess-jordan-anomaly',
       examId,
+      institutionId: 'inst-vignan',
+      institutionName: 'Vignan University',
       examTitle: 'CS 301: Advanced Algorithms & Data Structures',
       studentId: 'usr-student-3',
       studentName: 'Jordan Taylor',
@@ -682,13 +807,71 @@ print(two_sum(nums, target))`,
   if (!existingAudit) {
     await db.audit_logs().insertOne({
       id: 'log-seed-1',
+      institutionId: 'inst-vignan',
       timestamp: new Date(Date.now() - 3600000).toISOString(),
-      actorId: 'usr-examiner-1',
-      actorName: 'Dr. Sarah Jenkins',
+      actorId: 'usr-examiner-2',
+      actorName: 'Elena Rostova',
       actorRole: 'EXAMINER',
       action: 'EXAM_PUBLISHED',
       targetId: examId,
       details: 'Published CS 301 examination with mixed question formats (MCQ, Coding, Descriptive)',
+    });
+  }
+
+  // Seed VIT Exam (to demonstrate true multi-tenant isolation)
+  const vitExamId = 'exam-vit-cs401';
+  const existingVitExam = await db.exams().findOne({ id: vitExamId });
+  if (!existingVitExam) {
+    const vitExam: Exam = {
+      id: vitExamId,
+      institutionId: 'inst-vit',
+      institutionName: 'VIT',
+      title: 'CS 401: Distributed Systems & Consensus Algorithms',
+      courseCode: 'CS-401',
+      description:
+        'Advanced institutional assessment covering Paxos, Raft, Byzantine Fault Tolerance, and distributed vector clocks.',
+      durationMinutes: 60,
+      totalMarks: 50,
+      totalQuestions: 2,
+      status: 'ACTIVE',
+      createdBy: 'Dr. Sarah Jenkins',
+      accessCode: 'VIT9-ENG-72',
+      isPublished: true,
+      startTime: new Date(Date.now() - 3600000).toISOString(),
+      endTime: new Date(Date.now() + 86400000 * 7).toISOString(),
+      createdAt: new Date().toISOString(),
+      settings: {
+        fullscreenRequired: true,
+        clipboardMonitoring: true,
+        typingDynamics: true,
+        mouseDynamics: true,
+        allowQuestionNavigation: true,
+      },
+      questionDistribution: {
+        mcq: 1,
+        coding: 1,
+        descriptive: 0,
+      },
+    };
+    await db.exams().insertOne(vitExam);
+
+    await db.questions().insertOne({
+      id: 'q-vit-1',
+      examId: vitExamId,
+      title: 'Distributed Consensus Foundations',
+      questionText: 'Which property does the Raft consensus algorithm guarantee regarding log replication safety?',
+      questionType: 'MULTIPLE_CHOICE',
+      marks: 20,
+      orderIndex: 0,
+      category: 'Distributed Systems',
+      options: [
+        'Logs can be committed out of index order if leader changes',
+        'If a server has applied an entry at a given index, no other server will apply a different log entry for the same index',
+        'Followers accept log entries from any cluster node regardless of term number',
+        'Candidate nodes immediately commit logs without majority acknowledgment',
+      ],
+      correctAnswer: 1,
+      explanation: 'Raft guarantees State Machine Safety: If a server has applied a log entry at a given index to its state machine, no other server will ever apply a different log entry for the same index.',
     });
   }
 }

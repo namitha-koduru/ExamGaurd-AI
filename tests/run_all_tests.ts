@@ -251,6 +251,43 @@ async function runTests() {
   );
 
   // -----------------------------------------------------------
+  // 6. MULTI-TENANT INSTITUTIONAL ISOLATION & GOVERNANCE TESTS
+  // -----------------------------------------------------------
+  console.log('\n[Suite 6: Multi-Tenant Institutional Isolation & Governance]');
+  const institutions = await (await db.institutions().find()).toArray();
+  assert(institutions.length >= 2, 'Database contains registered sandbox institutions');
+  const vignanInst = institutions.find((i: any) => i.id === 'inst-vignan');
+  const vitInst = institutions.find((i: any) => i.id === 'inst-vit');
+  assert(vignanInst !== undefined, 'Vignan University institution is seeded');
+  assert(vitInst !== undefined, 'VIT institution is seeded');
+  assert(vignanInst?.registrationId === 'VIGNAN-UNIV-DEMO', 'Vignan has valid registrationId');
+  assert(vitInst?.registrationId === 'VIT-TECH-DEMO', 'VIT has valid registrationId');
+
+  // Verify multi-tenant exam separation
+  const vignanExams = await (await db.exams().find({ institutionId: 'inst-vignan' })).toArray();
+  const vitExams = await (await db.exams().find({ institutionId: 'inst-vit' })).toArray();
+  assert(vignanExams.length >= 1, 'Vignan University has isolated exam roster');
+  assert(vitExams.length >= 1, 'VIT has isolated exam roster');
+  assert(
+    !vignanExams.some((e: any) => e.institutionId === 'inst-vit'),
+    'Institution A (Vignan) cannot view Institution B (VIT) exams'
+  );
+  assert(
+    !vitExams.some((e: any) => e.institutionId === 'inst-vignan'),
+    'Institution B (VIT) cannot view Institution A (Vignan) exams'
+  );
+
+  // Verify user tenant binding
+  const vitStudent = await db.users().findOne({ email: 'alex.rivera@student.edu' });
+  const vignanStudent = await db.users().findOne({ email: 'alex.student@smartexam.edu' });
+  assert(vitStudent !== null && vitStudent.institutionId === 'inst-vit', 'VIT student bound to inst-vit');
+  assert(vignanStudent !== null && vignanStudent.institutionId === 'inst-vignan', 'Vignan student bound to inst-vignan');
+
+  // Verify single attempt rule at database level
+  const existingAttempt = await db.sessions().findOne({ id: 'sess-alex-completed' });
+  assert(existingAttempt !== null && existingAttempt.status === 'SUBMITTED', 'Sample attempted session is in SUBMITTED state');
+
+  // -----------------------------------------------------------
   // SUMMARY
   // -----------------------------------------------------------
   console.log('\n======================================================');

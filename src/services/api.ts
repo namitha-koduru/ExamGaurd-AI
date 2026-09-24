@@ -1,9 +1,10 @@
 /**
  * ExamGuard AI - Client API Service
- * ED-02 — AI-Based Exam Malpractice Detection
+ * Institutional Examination Platform & Behavioral Intelligence
  */
 
 import {
+  Institution,
   User,
   Exam,
   Question,
@@ -25,12 +26,50 @@ function getAuthHeaders(): HeadersInit {
 }
 
 export const api = {
+  // Institutions
+  async getInstitutions(): Promise<Institution[]> {
+    const res = await fetch(`${API_BASE}/auth/institutions`);
+    if (!res.ok) throw new Error('Failed to load institutions');
+    return res.json();
+  },
+
+  async registerInstitution(data: {
+    name: string;
+    registrationId: string;
+    type: string;
+    country: string;
+    domain?: string;
+    adminName: string;
+    adminEmail: string;
+    adminPassword: string;
+  }): Promise<{ institution: Institution; user: User; token: string }> {
+    const res = await fetch(`${API_BASE}/auth/register-institution`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Institutional registration failed');
+    }
+    const result = await res.json();
+    if (result.token) {
+      localStorage.setItem('examguard_token', result.token);
+    }
+    return result;
+  },
+
   // Auth
-  async login(email: string, password: string): Promise<{ token: string; user: User }> {
+  async login(
+    email: string,
+    password: string,
+    institutionId?: string,
+    institutionRegistrationId?: string
+  ): Promise<{ token: string; user: User }> {
     const res = await fetch(`${API_BASE}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email, password, institutionId, institutionRegistrationId }),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
@@ -43,11 +82,19 @@ export const api = {
     return data;
   },
 
-  async register(name: string, email: string, password: string, role: string): Promise<{ token: string; user: User }> {
+  async register(
+    name: string,
+    email: string,
+    password: string,
+    role: string,
+    institutionId?: string,
+    studentId?: string,
+    employeeId?: string
+  ): Promise<{ token: string; user: User }> {
     const res = await fetch(`${API_BASE}/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, email, password, role }),
+      body: JSON.stringify({ name, email, password, role, institutionId, studentId, employeeId }),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
@@ -69,8 +116,9 @@ export const api = {
   },
 
   // Exams
-  async getExams(): Promise<Exam[]> {
-    const res = await fetch(`${API_BASE}/exams`, {
+  async getExams(institutionId?: string): Promise<Exam[]> {
+    const url = institutionId ? `${API_BASE}/exams?institutionId=${encodeURIComponent(institutionId)}` : `${API_BASE}/exams`;
+    const res = await fetch(url, {
       headers: getAuthHeaders(),
     });
     if (!res.ok) throw new Error('Failed to fetch exams');
@@ -226,8 +274,9 @@ export const api = {
   },
 
   // Proctor & Analytics
-  async getSessions(filter?: { examId?: string; riskLevel?: string; status?: string; search?: string }): Promise<ExamSession[]> {
+  async getSessions(filter?: { examId?: string; riskLevel?: string; status?: string; search?: string; institutionId?: string }): Promise<ExamSession[]> {
     const params = new URLSearchParams();
+    if (filter?.institutionId) params.append('institutionId', filter.institutionId);
     if (filter?.examId) params.append('examId', filter.examId);
     if (filter?.riskLevel) params.append('riskLevel', filter.riskLevel);
     if (filter?.status) params.append('status', filter.status);

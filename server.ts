@@ -1,6 +1,6 @@
 /**
  * ExamGuard AI - Master Server Entrypoint
- * ED-02 — AI-Based Exam Malpractice Detection
+ * Institutional Examination Platform & Behavioral Intelligence
  * Detect Behavior, Not the Person
  */
 

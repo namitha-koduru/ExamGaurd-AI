@@ -32,6 +32,8 @@ router.post('/start', requireAuth, async (req: AuthRequest, res) => {
     const newSession: ExamSession = {
       id: sessionId,
       examId,
+      institutionId: exam.institutionId || student.institutionId || 'inst-vignan',
+      institutionName: exam.institutionName || student.institutionName || 'Vignan University',
       examTitle: exam.title,
       studentId: student.id,
       studentName: student.name,
@@ -52,6 +54,7 @@ router.post('/start', requireAuth, async (req: AuthRequest, res) => {
     // Initial audit log
     await db.audit_logs().insertOne({
       id: `log-${Date.now()}`,
+      institutionId: newSession.institutionId,
       timestamp: now,
       actorId: student.id,
       actorName: student.name,
@@ -254,9 +257,12 @@ router.post('/:id/submit', async (req, res) => {
 // GET /api/sessions - List sessions for examiner dashboard
 router.get('/', async (req, res) => {
   try {
-    const { riskLevel, status, examId, search } = req.query;
+    const { riskLevel, status, examId, search, institutionId } = req.query;
     const query: any = {};
 
+    if (institutionId) {
+      query.institutionId = institutionId;
+    }
     if (riskLevel && riskLevel !== 'ALL') {
       query.riskLevel = riskLevel;
     }

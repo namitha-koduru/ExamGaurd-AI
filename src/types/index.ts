@@ -1,13 +1,39 @@
 /**
  * ExamGuard AI - Core Type Definitions
- * ED-02 — AI-Based Exam Malpractice Detection
+ * Institutional Examination Platform & Behavioral Intelligence
  * Detect Behavior, Not the Person
  */
 
 export type UserRole = 'STUDENT' | 'EXAMINER' | 'ADMIN';
 
+export type InstitutionType =
+  | 'University'
+  | 'College'
+  | 'School'
+  | 'Training Center'
+  | 'Examination Body';
+
+export interface Institution {
+  id: string;
+  name: string;
+  registrationId: string; // e.g. VIT-TECH-DEMO or UNIV-2026-REG
+  type: InstitutionType;
+  country: string;
+  domain?: string;
+  adminName: string;
+  adminEmail: string;
+  status: 'ACTIVE' | 'PENDING';
+  isSampleSandbox?: boolean;
+  createdAt: string;
+}
+
 export interface User {
   id: string;
+  institutionId?: string;
+  institutionName?: string;
+  institutionRegistrationId?: string;
+  studentId?: string; // Roll / Registration Number
+  employeeId?: string; // Faculty / Examiner ID
   name: string;
   email: string;
   role: UserRole;
@@ -74,6 +100,8 @@ export interface ExamSettings {
 
 export interface Exam {
   id: string;
+  institutionId?: string;
+  institutionName?: string;
   title: string;
   courseCode: string;
   description: string;
@@ -171,6 +199,7 @@ export type BehaviorEventType =
 export interface BehaviorEvent {
   id: string;
   sessionId: string;
+  institutionId?: string;
   eventType: BehaviorEventType;
   timestamp: number; // millisecond epoch
   relativeSeconds: number;
@@ -267,6 +296,8 @@ export interface CodingSubmission {
 export interface ExamSession {
   id: string;
   examId: string;
+  institutionId?: string;
+  institutionName?: string;
   examTitle: string;
   studentId: string;
   studentName: string;
@@ -302,6 +333,7 @@ export interface ExamSession {
 
 export interface AuditLog {
   id: string;
+  institutionId?: string;
   timestamp: string;
   actorId: string;
   actorName: string;

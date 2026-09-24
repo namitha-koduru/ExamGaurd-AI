@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '../../context/AuthContext';
 import { ExamSession, Exam, RiskLevel } from '../../types';
 import { api } from '../../services/api';
 import { RiskBadge, StatusBadge } from '../../components/common/Badge';
@@ -32,6 +33,7 @@ export const ExaminerDashboard: React.FC<ExaminerDashboardProps> = ({
   onSelectSession,
   onCreateExam,
 }) => {
+  const { user } = useAuth();
   const [sessions, setSessions] = useState<ExamSession[]>([]);
   const [exams, setExams] = useState<Exam[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -47,8 +49,8 @@ export const ExaminerDashboard: React.FC<ExaminerDashboardProps> = ({
   const loadData = async () => {
     try {
       const [sessData, examsData] = await Promise.all([
-        api.getSessions(),
-        api.getExams(),
+        api.getSessions(user?.institutionId ? { institutionId: user.institutionId } : undefined),
+        api.getExams(user?.institutionId),
       ]);
       setSessions(sessData);
       setExams(examsData);
@@ -460,7 +462,7 @@ export const ExaminerDashboard: React.FC<ExaminerDashboardProps> = ({
                 <th className="py-3 px-4 font-semibold">Examination</th>
                 <th className="py-3 px-4 font-semibold">Status</th>
                 <th className="py-3 px-4 font-semibold">Calculated Score</th>
-                <th className="py-3 px-4 font-semibold">Malpractice Risk</th>
+                <th className="py-3 px-4 font-semibold">Behavioral Risk</th>
                 <th className="py-3 px-4 font-semibold">Telemetry Flags</th>
                 <th className="py-3 px-4 font-semibold text-right">Review Action</th>
               </tr>
@@ -521,7 +523,7 @@ export const ExaminerDashboard: React.FC<ExaminerDashboardProps> = ({
                           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/50 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 text-xs font-semibold transition-colors border border-indigo-200 dark:border-indigo-800"
                         >
                           <Eye className="w-3.5 h-3.5" />
-                          <span>Review Results & Malpractice</span>
+                          <span>Review Results & Behavioral Signals</span>
                         </button>
                       </td>
                     </tr>

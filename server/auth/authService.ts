@@ -22,6 +22,7 @@ export function generateToken(user: User): string {
     email: user.email,
     name: user.name,
     role: user.role,
+    institutionId: user.institutionId,
   };
   return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN } as jwt.SignOptions);
 }

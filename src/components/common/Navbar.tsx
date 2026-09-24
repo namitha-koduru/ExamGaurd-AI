@@ -16,6 +16,7 @@ import {
   FileCheck2,
   Lock,
   ChevronRight,
+  Building2,
 } from 'lucide-react';
 
 interface NavbarProps {
@@ -38,11 +39,11 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, onSelectTab }) => {
       <div className="bg-slate-900 text-slate-300 text-xs px-4 py-1.5 flex items-center justify-between border-b border-slate-800 font-sans">
         <div className="flex items-center gap-2">
           <span className="text-emerald-400 font-mono text-[10px] font-bold tracking-wide uppercase">
-            ED-02 PROTOCOL
+            MULTI-TENANT INTEGRITY ARCHITECTURE
           </span>
           <span className="text-slate-600">·</span>
           <span className="text-[11px] text-slate-300">
-            Institutional Exam Malpractice Detection Platform
+            ExamGuard AI Institutional Platform
           </span>
           <span className="text-slate-600 hidden sm:inline">·</span>
           <span className="text-slate-400 text-[11px] hidden sm:inline">
@@ -77,6 +78,17 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, onSelectTab }) => {
               <div className="text-[10px] text-slate-500 font-medium">Academic Integrity & Anomaly Engine</div>
             </div>
           </div>
+
+          {/* Active Institution Badge */}
+          {user?.institutionName && (
+            <div className="hidden lg:flex items-center gap-1.5 px-3 py-1 rounded-lg bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-xs">
+              <Building2 className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+              <span className="font-semibold text-slate-800 dark:text-slate-200">{user.institutionName}</span>
+              {user.institutionRegistrationId && (
+                <span className="text-[10px] font-mono text-slate-500">[{user.institutionRegistrationId}]</span>
+              )}
+            </div>
+          )}
 
           {/* Navigation Links */}
           <nav className="hidden md:flex items-center gap-1">

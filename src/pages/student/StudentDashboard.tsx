@@ -45,8 +45,8 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
     async function loadData() {
       try {
         const [allExams, allSessions] = await Promise.all([
-          api.getExams(),
-          api.getSessions(),
+          api.getExams(user?.institutionId),
+          api.getSessions(user?.institutionId ? { institutionId: user.institutionId } : undefined),
         ]);
         setExams(allExams);
         const mySessions = allSessions.filter(
@@ -112,12 +112,17 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
       {/* Student Welcome & Privacy Assurance */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
               Welcome, {user?.name}
             </h1>
+            {user?.institutionName && (
+              <span className="text-xs px-2.5 py-0.5 rounded-full font-sans bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200 font-medium border border-slate-200 dark:border-slate-700">
+                {user.institutionName}
+              </span>
+            )}
             <span className="text-xs px-2 py-0.5 rounded-full font-mono bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 font-semibold border border-indigo-200 dark:border-indigo-800">
-              Student ID: {user?.id}
+              ID: {user?.studentId || user?.id}
             </span>
           </div>
           <p className="text-xs text-slate-500 mt-1 max-w-2xl leading-relaxed">

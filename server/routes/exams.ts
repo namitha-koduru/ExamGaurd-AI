@@ -11,10 +11,15 @@ import { realtimeHub } from '../realtime/sse';
 
 const router = Router();
 
-// GET /api/exams - List all available exams
+// GET /api/exams - List available exams (scoped to institution if requested or user authenticated)
 router.get('/', async (req: AuthRequest, res) => {
   try {
-    const examsRes = await db.exams().find();
+    const institutionId = (req.query.institutionId as string) || req.user?.institutionId;
+    let query: any = {};
+    if (institutionId) {
+      query.institutionId = institutionId;
+    }
+    const examsRes = await db.exams().find(query);
     const exams: Exam[] = await examsRes.toArray();
     res.json(exams);
   } catch (err: any) {
@@ -78,6 +83,15 @@ router.post('/:id/validate-code', requireAuth, async (req: AuthRequest, res) => 
         valid: false,
         status: 'INVALID_CODE',
         message: 'Invalid Exam Code. Please verify the access key provided by your teacher.',
+      });
+    }
+
+    // 1b. Check Institutional Isolation
+    if (user.institutionId && exam.institutionId && user.institutionId !== exam.institutionId) {
+      return res.status(403).json({
+        valid: false,
+        status: 'INSTITUTION_MISMATCH',
+        message: `This examination is restricted to students of ${exam.institutionName || 'the issuing institution'}. Your account is affiliated with ${user.institutionName || 'another institution'}.`,
       });
     }
 
@@ -204,6 +218,8 @@ router.post('/:id/start', requireAuth, async (req: AuthRequest, res) => {
     const newSession: ExamSession = {
       id: sessionId,
       examId,
+      institutionId: exam.institutionId || student.institutionId || 'inst-vignan',
+      institutionName: exam.institutionName || student.institutionName || 'Vignan University',
       examTitle: exam.title,
       studentId: student.id,
       studentName: student.name,
@@ -225,6 +241,7 @@ router.post('/:id/start', requireAuth, async (req: AuthRequest, res) => {
     // Initial audit log
     await db.audit_logs().insertOne({
       id: `log-${Date.now()}`,
+      institutionId: newSession.institutionId,
       timestamp: startedAt,
       actorId: student.id,
       actorName: student.name,
@@ -319,6 +336,8 @@ router.post('/', requireAuth, requireRole(['EXAMINER', 'ADMIN']), async (req: Au
 
     const newExam: Exam = {
       id: examId,
+      institutionId: req.user?.institutionId || 'inst-vignan',
+      institutionName: req.user?.institutionName || 'Vignan University',
       title: title.trim(),
       courseCode: courseCode.trim().toUpperCase(),
       description: description || '',
@@ -354,6 +373,7 @@ router.post('/', requireAuth, requireRole(['EXAMINER', 'ADMIN']), async (req: Au
     // Audit log
     await db.audit_logs().insertOne({
       id: `log-${Date.now()}`,
+      institutionId: newExam.institutionId,
       timestamp: now,
       actorId: req.user!.id,
       actorName: req.user!.name,

@@ -1,6 +1,6 @@
 /**
  * ExamGuard AI - Main Application Entrypoint
- * ED-02 — AI-Based Exam Malpractice Detection
+ * Institutional Examination Platform & Behavioral Intelligence
  * Official Institutional Platform Architecture
  */
 
@@ -199,7 +199,7 @@ function MainApp() {
             <div className="flex items-center gap-2">
               <span className="font-bold text-slate-900 dark:text-white">ExamGuard AI</span>
               <span>·</span>
-              <span>ED-02 Institutional Examination Malpractice Detection</span>
+              <span>Institutional Examination Platform & Integrity Architecture</span>
             </div>
             <div className="flex items-center gap-4 text-[11px]">
               <span>FERPA & GDPR Compliant</span>
