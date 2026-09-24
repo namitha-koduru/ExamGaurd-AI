@@ -194,6 +194,63 @@ async function runTests() {
   assert(exams.length >= 1, 'Database contains default active curriculum exams');
 
   // -----------------------------------------------------------
+  // 5. PRIVACY FILTER & TELEMETRY SANITIZATION TESTS
+  // -----------------------------------------------------------
+  console.log('\n[Suite 5: Behavioral Privacy Filter]');
+  const { filterBehaviorBatch, isPermittedEventType } = await import('../server/services/behavior/privacyFilter');
+
+  assert(isPermittedEventType('FOCUS_LOST'), 'FOCUS_LOST is recognized as permitted event');
+  assert(isPermittedEventType('PASTE'), 'PASTE is recognized as permitted event');
+  assert(isPermittedEventType('TYPING_BEHAVIOR'), 'TYPING_BEHAVIOR is recognized as permitted event');
+  assert(!isPermittedEventType('SCREEN_CAPTURE_SENT'), 'SCREEN_CAPTURE_SENT is rejected as unpermitted');
+
+  const unsafeBatch = [
+    {
+      eventType: 'PASTE' as any,
+      timestamp: Date.now(),
+      metadata: {
+        clipboardText: 'https://pastebin.com/sensitive-answer',
+        estimatedCharacterCount: 38,
+        questionIndex: 1,
+      },
+    },
+    {
+      eventType: 'TYPING_BEHAVIOR' as any,
+      timestamp: Date.now(),
+      metadata: {
+        rawKeystrokes: ['p', 'a', 's', 's', 'w', 'o', 'r', 'd'],
+        typingSpeedWpm: 58,
+        interKeyVariance: 32,
+      },
+    },
+    {
+      eventType: 'UNAUTHORIZED_BACKGROUND_SURVEILLANCE' as any,
+      timestamp: Date.now(),
+      metadata: {},
+    },
+  ];
+
+  const filterResult = filterBehaviorBatch('test-session', unsafeBatch);
+  assert(filterResult.cleanEvents.length === 2, 'Unpermitted event types are dropped (2 of 3 accepted)');
+  assert(filterResult.strippedKeysCount >= 2, 'Forbidden keys (clipboardText, rawKeystrokes) are stripped');
+  assert(
+    (filterResult.cleanEvents[0].metadata as any).clipboardText === undefined,
+    'Clipboard text is guaranteed to be stripped from persisted event'
+  );
+  assert(
+    filterResult.cleanEvents[0].metadata.estimatedCharacterCount === 38,
+    'Permitted aggregate metadata (estimatedCharacterCount) is safely preserved'
+  );
+  assert(
+    (filterResult.cleanEvents[1].metadata as any).rawKeystrokes === undefined,
+    'Raw keystrokes are guaranteed to be stripped from persisted event'
+  );
+  assert(
+    filterResult.cleanEvents[1].metadata.typingSpeedWpm === 58,
+    'Aggregated typing speed WPM is safely retained'
+  );
+
+  // -----------------------------------------------------------
   // SUMMARY
   // -----------------------------------------------------------
   console.log('\n======================================================');

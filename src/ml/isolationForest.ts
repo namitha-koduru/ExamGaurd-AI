@@ -89,41 +89,58 @@ export function extractFeaturesFromEvents(
   const editIntervals: number[] = [];
 
   for (const event of events) {
-    switch (event.eventType) {
+    const evType = String(event.eventType || '').toUpperCase();
+    switch (evType) {
+      case 'FOCUS_LOST':
       case 'TAB_FOCUS_LOST':
       case 'WINDOW_BLUR':
+      case 'VISIBILITY_HIDDEN':
         focusLossCount++;
         if (activeQuestionIsCoding) {
           codingFocusLossCount++;
         }
         break;
+      case 'FOCUS_RETURNED':
       case 'TAB_FOCUS_RETURNED':
       case 'WINDOW_FOCUS':
-        if (event.metadata.durationMs) {
-          const sec = event.metadata.durationMs / 1000;
+      case 'VISIBILITY_VISIBLE': {
+        const ms = event.metadata.lostDurationMs ?? event.metadata.durationMs;
+        if (ms) {
+          const sec = ms / 1000;
           focusLossDuration += sec;
           if (activeQuestionIsCoding) {
             codingFocusLossDuration += sec;
           }
         }
         break;
+      }
+      case 'COPY':
       case 'COPY_ATTEMPT':
         copyCount++;
         break;
+      case 'PASTE':
       case 'PASTE_ATTEMPT':
         pasteCount++;
         if (activeQuestionIsCoding) {
           codePasteCount++;
         }
         break;
+      case 'CUT':
+      case 'CUT_ATTEMPT':
+        copyCount++;
+        break;
       case 'LARGE_CODE_INSERTION':
         largeInsertionCount++;
         break;
+      case 'CODE_EDITOR_ACTIVITY':
       case 'CODE_EDIT_ACTIVITY':
         if (event.metadata.durationMs) {
           codeEditDuration += event.metadata.durationMs / 1000;
         } else {
           codeEditDuration += 2;
+        }
+        if (event.metadata.largeInsertionCount) {
+          largeInsertionCount += event.metadata.largeInsertionCount;
         }
         if (lastEditTimestamp > 0) {
           const gap = (event.timestamp - lastEditTimestamp) / 1000;
@@ -143,31 +160,45 @@ export function extractFeaturesFromEvents(
         }
         break;
       case 'CODE_SUBMIT':
+      case 'CODE_SUBMISSION':
         codeSubmitCount++;
         break;
-      case 'KEYBOARD_ACTIVITY':
-        if (event.metadata.speedWpm !== undefined) {
-          typingSpeedSum += event.metadata.speedWpm;
+      case 'TYPING_BEHAVIOR':
+      case 'KEYBOARD_ACTIVITY': {
+        const speed = event.metadata.typingSpeedWpm ?? event.metadata.speedWpm;
+        if (speed !== undefined) {
+          typingSpeedSum += speed;
           typingSpeedSamples++;
         }
-        if (event.metadata.keyIntervalVariance !== undefined) {
-          typingVarianceSum += event.metadata.keyIntervalVariance;
+        const variance = event.metadata.interKeyVariance ?? event.metadata.keyIntervalVariance;
+        if (variance !== undefined) {
+          typingVarianceSum += variance;
         }
         break;
-      case 'MOUSE_ACTIVITY':
+      }
+      case 'MOUSE_BEHAVIOR':
+      case 'MOUSE_ACTIVITY': {
         mouseEventsCount++;
-        if (event.metadata.mouseIntensity !== undefined) {
-          mouseIntensitySum += event.metadata.mouseIntensity;
+        const intensity = event.metadata.mouseIntensity ?? (event.metadata.mouseMovementCount ? Math.min(100, event.metadata.mouseMovementCount * 2) : 50);
+        mouseIntensitySum += intensity;
+        if (event.metadata.averageMousePauseMs) {
+          idleDuration += (event.metadata.averageMousePauseMs / 1000) * (event.metadata.mousePauseCount || 1);
         }
         break;
-      case 'IDLE_ENDED':
-        if (event.metadata.idleDurationSec) {
-          idleDuration += event.metadata.idleDurationSec;
+      }
+      case 'IDLE_PERIOD':
+      case 'IDLE_ENDED': {
+        const idleMs = event.metadata.durationMs ?? (event.metadata.idleDurationSec ? event.metadata.idleDurationSec * 1000 : 0);
+        if (idleMs > 0) {
+          idleDuration += idleMs / 1000;
         }
         break;
+      }
+      case 'QUESTION_VIEWED':
+      case 'QUESTION_NAVIGATED':
       case 'QUESTION_CHANGED': {
         questionNavCount++;
-        const targetQ = event.metadata.questionIndex ?? 0;
+        const targetQ = event.metadata.questionIndex ?? (event.metadata.toIndex ?? 0);
         if (targetQ < currentQuestion) {
           backNavCount++;
         }
@@ -179,6 +210,9 @@ export function extractFeaturesFromEvents(
         activeQuestionIsCoding = event.metadata.questionType === 'CODING';
         break;
       }
+      case 'ANSWER_CHANGED':
+        // Recorded for answer modification dynamics
+        break;
       default:
         break;
     }

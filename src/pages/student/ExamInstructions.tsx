@@ -17,7 +17,7 @@ export const ExamInstructions: React.FC<ExamInstructionsProps> = ({
   onStartExam,
 }) => {
   const [browserOk, setBrowserOk] = useState<boolean>(true);
-  const [extensionOk, setExtensionOk] = useState<boolean>(false);
+  const [sensorOk, setSensorOk] = useState<boolean>(true);
   const [serverOk, setServerOk] = useState<boolean>(false);
   const [sessionReady, setSessionReady] = useState<boolean>(false);
   const [checking, setChecking] = useState<boolean>(true);
@@ -29,10 +29,9 @@ export const ExamInstructions: React.FC<ExamInstructionsProps> = ({
     const isModern = typeof window !== 'undefined' && 'localStorage' in window;
     setBrowserOk(isModern);
 
-    // 2. Extension check
-    const hasExtension = !!(window as any).__SMARTEXAM_EXTENSION_ACTIVE__;
-    // Default to true or simulated extension for seamless prototype demonstration
-    setExtensionOk(true);
+    // 2. In-browser behavioral sensor check (No extension required)
+    const hasWebApis = typeof window !== 'undefined' && 'addEventListener' in window;
+    setSensorOk(hasWebApis);
 
     // 3. Backend connectivity
     try {
@@ -61,7 +60,7 @@ export const ExamInstructions: React.FC<ExamInstructionsProps> = ({
     }
   };
 
-  const allPassed = browserOk && extensionOk && serverOk && sessionReady;
+  const allPassed = browserOk && sensorOk && serverOk && sessionReady;
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8 space-y-6">
@@ -159,12 +158,12 @@ export const ExamInstructions: React.FC<ExamInstructionsProps> = ({
 
           <div className="flex items-center justify-between p-2 rounded bg-slate-50 dark:bg-slate-800/50">
             <div className="flex items-center gap-1.5 text-slate-700 dark:text-slate-300">
-              <Chrome className="w-3.5 h-3.5 text-slate-400" />
-              <span>SmartExam Telemetry Sensor</span>
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
+              <span>In-Browser Privacy Telemetry Engine</span>
             </div>
-            {extensionOk ? (
+            {sensorOk ? (
               <span className="text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
-                <Check className="w-3.5 h-3.5" /> Sensor Active
+                <Check className="w-3.5 h-3.5" /> Sensor Ready
               </span>
             ) : (
               <span className="text-amber-500 font-medium flex items-center gap-1">

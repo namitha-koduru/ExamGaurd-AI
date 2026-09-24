@@ -65,7 +65,7 @@ export const ExaminerDashboard: React.FC<ExaminerDashboardProps> = ({
     return () => clearInterval(interval);
   }, []);
 
-  // Listen to SSE live proctor stream if available
+  // Listen to SSE live proctor stream with automatic in-memory reactive updates
   useEffect(() => {
     let eventSource: EventSource | null = null;
     try {
@@ -73,12 +73,21 @@ export const ExaminerDashboard: React.FC<ExaminerDashboardProps> = ({
       eventSource.onmessage = (event) => {
         try {
           const payload = JSON.parse(event.data);
-          if (payload.type === 'PROCTOR_ALERT' || payload.type === 'RISK_SCORE_UPDATED' || payload.type === 'SESSION_SUBMITTED' || payload.type === 'SESSION_STARTED') {
-            const desc = payload.type === 'SESSION_SUBMITTED'
-              ? `${payload.studentName} submitted ${payload.examTitle} (Score: ${payload.score}/${payload.maxScore}, Risk: ${payload.riskScore})`
-              : payload.type === 'SESSION_STARTED'
-              ? `${payload.studentName} started ${payload.examTitle} (Code verified)`
-              : `${payload.studentName || 'Student'}: ${payload.message || 'Telemetry updated'}`;
+          const type = payload.type;
+          const data = payload.payload || payload;
+
+          if (type === 'RISK_UPDATE') {
+            // Live update session risk in-memory without waiting for refresh
+            setSessions((prev) =>
+              prev.map((s) =>
+                s.id === data.sessionId
+                  ? { ...s, riskScore: data.riskScore, riskLevel: data.riskLevel }
+                  : s
+              )
+            );
+
+            const isElevated = data.riskScore >= 55;
+            const desc = `${data.studentName || 'Candidate'}: Behavioral Risk updated to ${data.riskScore}/100 (${data.riskLevel})${isElevated ? ' — Review Recommended' : ' — Normal Pattern'}`;
 
             setLiveEvents((prev) => [
               {
@@ -86,16 +95,60 @@ export const ExaminerDashboard: React.FC<ExaminerDashboardProps> = ({
                 time: new Date().toLocaleTimeString(),
                 text: desc,
               },
-              ...prev.slice(0, 5),
+              ...prev.slice(0, 9),
+            ]);
+          } else if (type === 'BEHAVIOR_UPDATE') {
+            const ev = data.latestEventType || 'Interaction event';
+            const desc = `${data.studentName || 'Candidate'}: Telemetry event ${ev} received (${data.eventCount} events buffered)`;
+
+            setLiveEvents((prev) => [
+              {
+                id: `${Date.now()}-${Math.random()}`,
+                time: new Date().toLocaleTimeString(),
+                text: desc,
+              },
+              ...prev.slice(0, 9),
+            ]);
+          } else if (type === 'SESSION_STARTED') {
+            const desc = `Candidate ${data.studentName} started examination '${data.examTitle}'`;
+            setLiveEvents((prev) => [
+              {
+                id: `${Date.now()}-${Math.random()}`,
+                time: new Date().toLocaleTimeString(),
+                text: desc,
+              },
+              ...prev.slice(0, 9),
+            ]);
+            loadData();
+          } else if (type === 'SESSION_SUBMITTED') {
+            const desc = `Candidate ${data.studentName} submitted '${data.examTitle}' (Score: ${data.score}/${data.maxScore}, Risk: ${data.riskScore})`;
+            setLiveEvents((prev) => [
+              {
+                id: `${Date.now()}-${Math.random()}`,
+                time: new Date().toLocaleTimeString(),
+                text: desc,
+              },
+              ...prev.slice(0, 9),
+            ]);
+            loadData();
+          } else if (type === 'SESSION_REVIEWED') {
+            const desc = `Examiner ${data.reviewer} updated proctor review status to '${data.proctorStatus}'`;
+            setLiveEvents((prev) => [
+              {
+                id: `${Date.now()}-${Math.random()}`,
+                time: new Date().toLocaleTimeString(),
+                text: desc,
+              },
+              ...prev.slice(0, 9),
             ]);
             loadData();
           }
-        } catch (e) {
+        } catch {
           // parse error
         }
       };
     } catch (err) {
-      console.warn('SSE connection unavailable in this context, using polling.');
+      console.warn('SSE connection unavailable in this context, using polling fallback.');
     }
 
     return () => {

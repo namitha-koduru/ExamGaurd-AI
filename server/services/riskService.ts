@@ -7,30 +7,26 @@ import { db } from '../db/mongo';
 import { extractFeaturesFromEvents, calculateExplainableRisk } from '../../src/ml/isolationForest';
 import { BehaviorEvent, ExamSession, AnomalyReport, BehavioralFeatures } from '../../src/types';
 import { realtimeHub } from '../realtime/sse';
+import { filterBehaviorBatch } from './behavior/privacyFilter';
 
 export async function processBehaviorBatch(
   sessionId: string,
   events: Partial<BehaviorEvent>[]
-): Promise<{ session: ExamSession; anomalyReport: AnomalyReport; features: BehavioralFeatures } | null> {
+): Promise<{ session: ExamSession; anomalyReport: AnomalyReport; features: BehavioralFeatures; strippedKeysCount: number } | null> {
   const session = await db.sessions().findOne({ id: sessionId });
   if (!session) {
     return null;
   }
 
-  // 1. Prepare and persist events
-  const preparedEvents: BehaviorEvent[] = events.map((e) => ({
-    id: e.id || `evt-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+  // 1. Filter and sanitize telemetry through privacy boundary
+  const { cleanEvents, strippedKeysCount, rejectedEventsCount, privacyViolationsDetected } = filterBehaviorBatch(
     sessionId,
-    eventType: e.eventType as any,
-    timestamp: e.timestamp || Date.now(),
-    relativeSeconds: Math.round(
-      Math.max(0, ((e.timestamp || Date.now()) - new Date(session.startedAt).getTime()) / 1000)
-    ),
-    metadata: e.metadata || {},
-  }));
+    events,
+    session.startedAt
+  );
 
-  if (preparedEvents.length > 0) {
-    await db.behavior_events().insertMany(preparedEvents);
+  if (cleanEvents.length > 0) {
+    await db.behavior_events().insertMany(cleanEvents);
   }
 
   // 2. Fetch all events for this session to compute updated features
@@ -67,10 +63,14 @@ export async function processBehaviorBatch(
   };
 
   // 6. Broadcast live risk and event updates via SSE to examiners
+  const latestEvent = cleanEvents[cleanEvents.length - 1];
   realtimeHub.broadcast('BEHAVIOR_UPDATE', {
     sessionId,
-    eventCount: preparedEvents.length,
-    latestEventType: preparedEvents[preparedEvents.length - 1]?.eventType,
+    studentName: session.studentName,
+    examTitle: session.examTitle,
+    eventCount: cleanEvents.length,
+    latestEventType: latestEvent?.eventType,
+    metadata: latestEvent?.metadata,
     timestamp: Date.now(),
   });
 
@@ -81,11 +81,14 @@ export async function processBehaviorBatch(
     riskScore: updatedSession.riskScore,
     riskLevel: updatedSession.riskLevel,
     latestAnomalyCount: anomalyReport.contributingFactors.length,
+    recommendation: anomalyReport.recommendation,
+    timestamp: Date.now(),
   });
 
   return {
     session: updatedSession,
     anomalyReport,
     features,
+    strippedKeysCount,
   };
 }

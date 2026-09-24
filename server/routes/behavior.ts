@@ -24,6 +24,8 @@ router.post('/events', async (req, res) => {
     res.json({
       success: true,
       processedEvents: events.length,
+      privacyFiltered: true,
+      strippedKeysCount: result.strippedKeysCount,
       currentRiskScore: result.session.riskScore,
       currentRiskLevel: result.session.riskLevel,
     });

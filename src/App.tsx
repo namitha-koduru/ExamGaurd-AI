@@ -19,8 +19,6 @@ import { SessionDetail } from './pages/examiner/SessionDetail';
 import { AnalyticsView } from './pages/examiner/AnalyticsView';
 import { CreateExamModal } from './pages/examiner/CreateExamModal';
 import { PrivacyPage } from './pages/PrivacyPage';
-import { ExtensionHub } from './pages/ExtensionHub';
-import { ExtensionSimulatorBar } from './components/common/ExtensionSimulatorBar';
 import { api } from './services/api';
 import { Exam, ExamSession, Question } from './types';
 
@@ -86,23 +84,6 @@ function MainApp() {
 
   const isExaminer = user?.role === 'EXAMINER' || user?.role === 'ADMIN';
 
-  // Telemetry trigger handler for Simulator Bar
-  const handleSimulatorEvent = async (eventType: string, metadata: Record<string, any> = {}) => {
-    if (activeSession) {
-      try {
-        await api.sendBehaviorEvents(activeSession.id, [
-          {
-            eventType: eventType as any,
-            timestamp: Date.now(),
-            metadata,
-          },
-        ]);
-      } catch (err) {
-        console.error('Simulator event failed:', err);
-      }
-    }
-  };
-
   if (isLoading) {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center text-slate-500 text-xs font-mono">
@@ -120,10 +101,6 @@ function MainApp() {
           session={activeSession}
           questions={sessionQuestions}
           onSubmitSuccess={handleExamSubmitSuccess}
-        />
-        <ExtensionSimulatorBar
-          activeSessionId={activeSession.id}
-          onTriggerEvent={handleSimulatorEvent}
         />
       </div>
     );
@@ -147,7 +124,6 @@ function MainApp() {
           if (tab === 'examiner-dashboard') setSelectedSessionId(null);
           if (tab === 'student-exams') setSelectedExam(null);
         }}
-        extensionActive={true}
       />
 
       <main className="flex-1">
@@ -214,7 +190,6 @@ function MainApp() {
 
         {/* Informational Pages */}
         {currentTab === 'privacy' && <PrivacyPage />}
-        {currentTab === 'extension-hub' && <ExtensionHub />}
       </main>
 
       {/* Official Institutional Footer (Only on standard pages) */}

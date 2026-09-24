@@ -64,7 +64,6 @@ export interface Question {
 }
 
 export interface ExamSettings {
-  extensionRequired?: boolean;
   fullscreenRequired?: boolean;
   clipboardMonitoring?: boolean;
   typingDynamics?: boolean;
@@ -126,28 +125,48 @@ export interface AnomalyReport {
 }
 
 export type BehaviorEventType =
+  // Focus & Window Events
+  | 'FOCUS_LOST'
+  | 'FOCUS_RETURNED'
   | 'TAB_FOCUS_LOST'
   | 'TAB_FOCUS_RETURNED'
   | 'WINDOW_BLUR'
   | 'WINDOW_FOCUS'
   | 'FULLSCREEN_ENTERED'
   | 'FULLSCREEN_EXITED'
+  // Clipboard Events
+  | 'COPY'
+  | 'PASTE'
+  | 'CUT'
   | 'COPY_ATTEMPT'
   | 'PASTE_ATTEMPT'
-  | 'LARGE_CODE_INSERTION'
+  | 'CUT_ATTEMPT'
+  // Interaction Dynamics
+  | 'TYPING_BEHAVIOR'
   | 'KEYBOARD_ACTIVITY'
+  | 'MOUSE_BEHAVIOR'
   | 'MOUSE_ACTIVITY'
-  | 'QUESTION_CHANGED'
-  | 'QUESTION_REVISITED'
-  | 'ANSWER_STARTED'
-  | 'ANSWER_SUBMITTED'
+  | 'SCROLL_BEHAVIOR'
+  | 'SCROLL_ACTIVITY'
+  | 'IDLE_PERIOD'
   | 'IDLE_STARTED'
   | 'IDLE_ENDED'
+  // Navigation & Answers
+  | 'QUESTION_VIEWED'
+  | 'QUESTION_NAVIGATED'
+  | 'QUESTION_CHANGED'
+  | 'QUESTION_REVISITED'
+  | 'ANSWER_CHANGED'
+  | 'ANSWER_STARTED'
+  | 'ANSWER_SUBMITTED'
+  // Coding Behavior
+  | 'CODE_EDITOR_ACTIVITY'
   | 'CODE_EDIT_ACTIVITY'
   | 'CODE_RUN'
   | 'CODE_SUBMIT'
-  | 'EXTENSION_CONNECTED'
-  | 'EXTENSION_DISCONNECTED';
+  | 'CODE_SUBMISSION'
+  | 'LARGE_CODE_INSERTION'
+  | 'COMPILE_RESULT';
 
 export interface BehaviorEvent {
   id: string;

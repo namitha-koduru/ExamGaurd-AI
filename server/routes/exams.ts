@@ -333,7 +333,6 @@ router.post('/', requireAuth, requireRole(['EXAMINER', 'ADMIN']), async (req: Au
       endTime: finalEndTime,
       createdAt: now,
       settings: {
-        extensionRequired: !!settings.extensionRequired,
         fullscreenRequired: settings.fullscreenRequired !== false,
         clipboardMonitoring: settings.clipboardMonitoring !== false,
         typingDynamics: settings.typingDynamics !== false,

@@ -10,7 +10,6 @@ import {
   Activity,
   BookOpen,
   BarChart3,
-  Chrome,
   LogOut,
   User as UserIcon,
   Shield,
@@ -22,7 +21,6 @@ import {
 interface NavbarProps {
   currentTab: string;
   onSelectTab: (tab: string) => void;
-  extensionActive?: boolean;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({ currentTab, onSelectTab }) => {
@@ -104,16 +102,6 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, onSelectTab }) => {
                 >
                   Privacy & Ethics Charter
                 </button>
-                <button
-                  onClick={() => onSelectTab('extension-hub')}
-                  className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${
-                    currentTab === 'extension-hub'
-                      ? 'text-indigo-600 dark:text-indigo-400 font-bold'
-                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                  }`}
-                >
-                  Extension Agent
-                </button>
               </>
             ) : !isExaminer ? (
               // Student navigation
@@ -139,17 +127,6 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, onSelectTab }) => {
                 >
                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
                   Student Privacy Charter
-                </button>
-                <button
-                  onClick={() => onSelectTab('extension-hub')}
-                  className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors flex items-center gap-1.5 ${
-                    currentTab === 'extension-hub'
-                      ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white'
-                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800/50'
-                  }`}
-                >
-                  <Chrome className="w-3.5 h-3.5" />
-                  Browser Monitor
                 </button>
               </>
             ) : (
@@ -187,17 +164,6 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, onSelectTab }) => {
                 >
                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
                   Compliance Charter
-                </button>
-                <button
-                  onClick={() => onSelectTab('extension-hub')}
-                  className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors flex items-center gap-1.5 ${
-                    currentTab === 'extension-hub'
-                      ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white'
-                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800/50'
-                  }`}
-                >
-                  <Chrome className="w-3.5 h-3.5" />
-                  Extension Agent
                 </button>
               </>
             )}

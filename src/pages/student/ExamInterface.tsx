@@ -51,8 +51,20 @@ export const ExamInterface: React.FC<ExamInterfaceProps> = ({
   const telemetryBuffer = useRef<Partial<BehaviorEvent>[]>([]);
   const lastFocusLoss = useRef<number>(0);
   const keyTimestamps = useRef<number[]>([]);
+  const lastKeyTime = useRef<number>(0);
+  const interKeyIntervals = useRef<number[]>([]);
+  const longPauseCount = useRef<number>(0);
   const mouseMoves = useRef<number>(0);
+  const mousePauses = useRef<number>(0);
+  const lastMouseMoveTime = useRef<number>(Date.now());
+  const mousePauseDurations = useRef<number[]>([]);
+  const scrollEvents = useRef<number>(0);
+  const lastScrollY = useRef<number>(0);
+  const scrollDirectionChanges = useRef<number>(0);
+  const lastInteractionTime = useRef<number>(Date.now());
+  const idleReportedForPeriod = useRef<boolean>(false);
   const qStartTime = useRef<number>(Date.now());
+  const answerChangeCounts = useRef<Record<string, number>>({});
 
   // 1. Authoritative Timer synchronized with session start time
   useEffect(() => {
@@ -75,6 +87,9 @@ export const ExamInterface: React.FC<ExamInterfaceProps> = ({
 
   // 2. Behavioral Telemetry Collection
   const recordEvent = (eventType: string, metadata: Record<string, any> = {}) => {
+    lastInteractionTime.current = Date.now();
+    idleReportedForPeriod.current = false;
+
     const event: Partial<BehaviorEvent> = {
       eventType: eventType as any,
       timestamp: Date.now(),
@@ -84,7 +99,9 @@ export const ExamInterface: React.FC<ExamInterfaceProps> = ({
 
     if (
       telemetryBuffer.current.length >= 8 ||
+      eventType === 'FOCUS_LOST' ||
       eventType === 'TAB_FOCUS_LOST' ||
+      eventType === 'PASTE' ||
       eventType === 'PASTE_ATTEMPT' ||
       eventType === 'LARGE_CODE_INSERTION'
     ) {
@@ -113,55 +130,93 @@ export const ExamInterface: React.FC<ExamInterfaceProps> = ({
     return () => clearInterval(interval);
   }, [answers, session.id]);
 
-  // Window Focus, Blur, Clipboard & Fullscreen Listeners
+  // Idle behavior detector (inactivity >= 15 seconds)
+  useEffect(() => {
+    const idleCheck = setInterval(() => {
+      const inactiveDuration = Date.now() - lastInteractionTime.current;
+      if (inactiveDuration >= 15000 && !idleReportedForPeriod.current) {
+        idleReportedForPeriod.current = true;
+        recordEvent('IDLE_PERIOD', {
+          durationMs: inactiveDuration,
+          idleDurationSec: Math.round(inactiveDuration / 1000),
+        });
+      }
+    }, 5000);
+    return () => clearInterval(idleCheck);
+  }, []);
+
+  // Initial question viewed event
+  useEffect(() => {
+    if (questions[currentQIndex]) {
+      recordEvent('QUESTION_VIEWED', {
+        questionId: questions[currentQIndex]?.id,
+        questionIndex: currentQIndex,
+        questionType: questions[currentQIndex]?.questionType,
+      });
+    }
+  }, []);
+
+  // Privacy-Preserving Window Focus, Blur, Clipboard & Typing Listeners
   useEffect(() => {
     const handleBlur = () => {
       lastFocusLoss.current = Date.now();
-      recordEvent('TAB_FOCUS_LOST', {
+      recordEvent('FOCUS_LOST', {
         reason: 'window_blur',
+        durationBeforeReturn: null,
         questionIndex: currentQIndex,
         questionId: questions[currentQIndex]?.id,
-        questionType: questions[currentQIndex]?.questionType,
       });
       setTelemetryNotice({
-        message: 'Exam window lost focus. Focus transitions are logged for proctor review.',
+        message: 'Exam window lost focus. Focus transitions are logged for instructor review.',
         type: 'warn',
       });
       setTimeout(() => setTelemetryNotice(null), 4000);
     };
 
     const handleFocus = () => {
-      const durationMs = lastFocusLoss.current > 0 ? Date.now() - lastFocusLoss.current : 0;
-      recordEvent('TAB_FOCUS_RETURNED', { durationMs });
+      const lostDurationMs = lastFocusLoss.current > 0 ? Date.now() - lastFocusLoss.current : 0;
+      recordEvent('FOCUS_RETURNED', { lostDurationMs, durationMs: lostDurationMs });
       lastFocusLoss.current = 0;
     };
 
     const handleVisibility = () => {
       if (document.hidden) {
         lastFocusLoss.current = Date.now();
-        recordEvent('TAB_FOCUS_LOST', { reason: 'document_hidden' });
+        recordEvent('FOCUS_LOST', { reason: 'document_hidden', durationBeforeReturn: null });
       } else {
-        const durationMs = lastFocusLoss.current > 0 ? Date.now() - lastFocusLoss.current : 0;
-        recordEvent('TAB_FOCUS_RETURNED', { durationMs, reason: 'document_visible' });
+        const lostDurationMs = lastFocusLoss.current > 0 ? Date.now() - lastFocusLoss.current : 0;
+        recordEvent('FOCUS_RETURNED', { lostDurationMs, durationMs: lostDurationMs, reason: 'document_visible' });
         lastFocusLoss.current = 0;
       }
     };
 
     const handleCopy = () => {
-      recordEvent('COPY_ATTEMPT', {
-        charCount: window.getSelection()?.toString().length || 0,
+      const charCount = window.getSelection()?.toString().length || 0;
+      recordEvent('COPY', {
+        estimatedCharacterCount: charCount,
+        charCount,
         questionIndex: currentQIndex,
       });
       setTelemetryNotice({
-        message: 'Notice: Content copying is logged in the session audit trail.',
+        message: 'Notice: Content copy event logged in audit stream.',
         type: 'warn',
       });
       setTimeout(() => setTelemetryNotice(null), 3500);
     };
 
+    const handleCut = () => {
+      const charCount = window.getSelection()?.toString().length || 0;
+      recordEvent('CUT', {
+        estimatedCharacterCount: charCount,
+        charCount,
+        questionIndex: currentQIndex,
+      });
+    };
+
     const handlePaste = (e: ClipboardEvent) => {
       const len = e.clipboardData?.getData('text')?.length || 0;
-      recordEvent('PASTE_ATTEMPT', {
+      recordEvent('PASTE', {
+        estimatedCharacterCount: len,
         charCount: len,
         questionIndex: currentQIndex,
         questionType: questions[currentQIndex]?.questionType,
@@ -173,23 +228,98 @@ export const ExamInterface: React.FC<ExamInterfaceProps> = ({
       setTimeout(() => setTelemetryNotice(null), 3500);
     };
 
+    // Typing behavior (Aggregated statistics only, NEVER store raw keystrokes)
     const handleKeyDown = () => {
       const now = Date.now();
+      lastInteractionTime.current = now;
+      idleReportedForPeriod.current = false;
+
+      if (lastKeyTime.current > 0) {
+        const interval = now - lastKeyTime.current;
+        if (interval > 2000) {
+          longPauseCount.current++;
+        } else if (interval > 20 && interval < 2000) {
+          interKeyIntervals.current.push(interval);
+          if (interKeyIntervals.current.length > 20) interKeyIntervals.current.shift();
+        }
+      }
+      lastKeyTime.current = now;
+
       keyTimestamps.current.push(now);
       if (keyTimestamps.current.length > 15) keyTimestamps.current.shift();
 
-      if (keyTimestamps.current.length >= 8) {
+      if (keyTimestamps.current.length >= 10) {
         const delta = (now - keyTimestamps.current[0]) / 1000;
         const wpm = delta > 0 ? Math.round(((keyTimestamps.current.length / 5) / delta) * 60) : 40;
-        recordEvent('KEYBOARD_ACTIVITY', { speedWpm: Math.min(120, wpm) });
+        const avgInterval = interKeyIntervals.current.length > 0
+          ? Math.round(interKeyIntervals.current.reduce((a, b) => a + b, 0) / interKeyIntervals.current.length)
+          : 140;
+        const variance = interKeyIntervals.current.length > 1
+          ? Math.round(interKeyIntervals.current.reduce((acc, v) => acc + Math.pow(v - avgInterval, 2), 0) / interKeyIntervals.current.length)
+          : 45;
+
+        recordEvent('TYPING_BEHAVIOR', {
+          typingSpeedWpm: Math.min(140, wpm),
+          speedWpm: Math.min(140, wpm),
+          averageInterKeyIntervalMs: avgInterval,
+          interKeyVariance: variance,
+          keyIntervalVariance: variance,
+          longPauseCount: longPauseCount.current,
+        });
       }
     };
 
+    // Mouse behavior (Aggregated dynamics, NEVER store raw coordinates)
     const handleMouseMove = () => {
+      const now = Date.now();
+      lastInteractionTime.current = now;
+      idleReportedForPeriod.current = false;
+
+      const pauseDuration = now - lastMouseMoveTime.current;
+      if (pauseDuration >= 1000) {
+        mousePauses.current++;
+        mousePauseDurations.current.push(pauseDuration);
+        if (mousePauseDurations.current.length > 15) mousePauseDurations.current.shift();
+      }
+      lastMouseMoveTime.current = now;
+
       mouseMoves.current++;
-      if (mouseMoves.current >= 40) {
-        recordEvent('MOUSE_ACTIVITY', { mouseIntensity: 55 });
+      if (mouseMoves.current >= 45) {
+        const avgPause = mousePauseDurations.current.length > 0
+          ? Math.round(mousePauseDurations.current.reduce((a, b) => a + b, 0) / mousePauseDurations.current.length)
+          : 600;
+
+        recordEvent('MOUSE_BEHAVIOR', {
+          mouseMovementCount: mouseMoves.current,
+          mousePauseCount: mousePauses.current,
+          averageMousePauseMs: avgPause,
+          mouseIntensity: 55,
+        });
         mouseMoves.current = 0;
+      }
+    };
+
+    // Scrolling behavior (Aggregated dynamics)
+    const handleScroll = () => {
+      const now = Date.now();
+      lastInteractionTime.current = now;
+      idleReportedForPeriod.current = false;
+
+      scrollEvents.current++;
+      const currentScrollY = window.scrollY || document.documentElement.scrollTop;
+      if (lastScrollY.current !== 0) {
+        const direction = currentScrollY > lastScrollY.current ? 'down' : 'up';
+        if (direction) scrollDirectionChanges.current++;
+      }
+      lastScrollY.current = currentScrollY;
+
+      if (scrollEvents.current >= 20) {
+        recordEvent('SCROLL_BEHAVIOR', {
+          scrollEventCount: scrollEvents.current,
+          scrollDirectionChanges: scrollDirectionChanges.current,
+        });
+        scrollEvents.current = 0;
+        scrollDirectionChanges.current = 0;
       }
     };
 
@@ -212,9 +342,11 @@ export const ExamInterface: React.FC<ExamInterfaceProps> = ({
     window.addEventListener('focus', handleFocus);
     document.addEventListener('visibilitychange', handleVisibility);
     document.addEventListener('copy', handleCopy);
+    document.addEventListener('cut', handleCut);
     document.addEventListener('paste', handlePaste);
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('scroll', handleScroll, { passive: true });
     document.addEventListener('fullscreenchange', handleFullscreenChange);
 
     return () => {
@@ -222,9 +354,11 @@ export const ExamInterface: React.FC<ExamInterfaceProps> = ({
       window.removeEventListener('focus', handleFocus);
       document.removeEventListener('visibilitychange', handleVisibility);
       document.removeEventListener('copy', handleCopy);
+      document.removeEventListener('cut', handleCut);
       document.removeEventListener('paste', handlePaste);
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('scroll', handleScroll);
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
     };
   }, [currentQIndex, questions]);
@@ -270,6 +404,15 @@ export const ExamInterface: React.FC<ExamInterfaceProps> = ({
     if (!q) return;
     const updated = { ...answers, [q.id]: val };
     setAnswers(updated);
+
+    const count = (answerChangeCounts.current[q.id] || 0) + 1;
+    answerChangeCounts.current[q.id] = count;
+    recordEvent('ANSWER_CHANGED', {
+      questionId: q.id,
+      questionIndex: currentQIndex,
+      changeCount: count,
+      questionType: 'CODING',
+    });
   };
 
   // Descriptive answer change handler
@@ -278,6 +421,15 @@ export const ExamInterface: React.FC<ExamInterfaceProps> = ({
     if (!q) return;
     const updated = { ...answers, [q.id]: val };
     setAnswers(updated);
+
+    const count = (answerChangeCounts.current[q.id] || 0) + 1;
+    answerChangeCounts.current[q.id] = count;
+    recordEvent('ANSWER_CHANGED', {
+      questionId: q.id,
+      questionIndex: currentQIndex,
+      changeCount: count,
+      questionType: 'DESCRIPTIVE',
+    });
   };
 
   const handleNavigateQuestion = (index: number) => {
@@ -286,11 +438,14 @@ export const ExamInterface: React.FC<ExamInterfaceProps> = ({
     const timeSpent = Math.round((Date.now() - qStartTime.current) / 1000);
     const targetQ = questions[index];
 
-    recordEvent('QUESTION_CHANGED', {
+    recordEvent('QUESTION_NAVIGATED', {
       fromIndex: currentQIndex,
+      toIndex: index,
       questionIndex: index,
+      questionId: targetQ?.id,
       questionType: targetQ?.questionType,
       timeSpentSec: timeSpent,
+      rapidNavigation: timeSpent < 3,
     });
 
     qStartTime.current = Date.now();

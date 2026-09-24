@@ -326,7 +326,6 @@ async function seedDatabase() {
       endTime: new Date(Date.now() + 86400000 * 5).toISOString(),
       createdAt: new Date().toISOString(),
       settings: {
-        extensionRequired: false,
         fullscreenRequired: true,
         clipboardMonitoring: true,
         typingDynamics: true,
