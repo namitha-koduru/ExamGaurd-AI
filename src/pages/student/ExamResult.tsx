@@ -5,6 +5,7 @@
 
 import React from 'react';
 import { ExamSession } from '../../types';
+import { Logo } from '../../components/common/Logo';
 import {
   CheckCircle2,
   ShieldCheck,
@@ -30,6 +31,10 @@ export const ExamResult: React.FC<ExamResultProps> = ({ session, onReturnDashboa
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-10 text-center space-y-6">
+      <div className="flex justify-center mb-2">
+        <Logo size={36} subtitle={session.institutionName || 'Institutional Academic Registry'} />
+      </div>
+
       <div className="w-14 h-14 bg-emerald-100 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 rounded-full flex items-center justify-center mx-auto text-emerald-600 dark:text-emerald-400">
         <CheckCircle2 className="w-7 h-7" />
       </div>

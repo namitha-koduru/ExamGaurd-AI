@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Exam } from '../../types';
 import { api } from '../../services/api';
+import { Logo } from '../../components/common/Logo';
 import { Check, AlertCircle, ShieldCheck, Clock, FileText, ArrowRight, ArrowLeft, RefreshCw, Chrome } from 'lucide-react';
 
 interface ExamInstructionsProps {
@@ -64,13 +65,17 @@ export const ExamInstructions: React.FC<ExamInstructionsProps> = ({
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8 space-y-6">
-      <button
-        onClick={onBack}
-        className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors"
-      >
-        <ArrowLeft className="w-3.5 h-3.5" />
-        Back to Dashboard
-      </button>
+      <div className="flex items-center justify-between">
+        <button
+          onClick={onBack}
+          className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" />
+          Back to Dashboard
+        </button>
+
+        <Logo size={24} subtitle={false} />
+      </div>
 
       {/* Header */}
       <div className="border-b border-slate-200 dark:border-slate-800 pb-4">

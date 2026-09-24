@@ -9,6 +9,7 @@ import { ExamSession, BehaviorEvent, AnomalyReport, BaselineFeatureComparison } 
 import { api } from '../../services/api';
 import { RiskBadge, StatusBadge } from '../../components/common/Badge';
 import { Timeline } from '../../components/common/Timeline';
+import { LoadingScreen } from '../../components/common/LoadingScreen';
 import {
   ArrowLeft,
   AlertTriangle,
@@ -86,8 +87,18 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
 
   if (loading || !session) {
     return (
-      <div className="py-24 text-center text-slate-500 text-xs">
-        Loading behavioral session forensics...
+      <div className="max-w-6xl mx-auto px-4 py-16">
+        <LoadingScreen
+          mode="inline"
+          title="Loading Behavioral Forensics"
+          subtitle="Decrypting session audit logs and calculating anomaly vectors..."
+          phases={[
+            'Retrieving cryptographic session event stream...',
+            'Comparing candidate keystroke dynamics against cohort baseline...',
+            'Aggregating copy-paste, focus loss, and window switches...',
+            'Forensic timeline ready • Displaying telemetry inspector',
+          ]}
+        />
       </div>
     );
   }

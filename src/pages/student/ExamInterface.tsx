@@ -9,6 +9,8 @@ import { Exam, Question, ExamSession, BehaviorEvent } from '../../types';
 import { api } from '../../services/api';
 import { CodeWorkspace } from '../../components/coding/CodeWorkspace';
 import { DescriptiveWorkspace } from '../../components/descriptive/DescriptiveWorkspace';
+import { LogoIcon } from '../../components/common/Logo';
+import { LoadingScreen } from '../../components/common/LoadingScreen';
 import {
   Clock,
   ChevronLeft,
@@ -483,12 +485,31 @@ export const ExamInterface: React.FC<ExamInterfaceProps> = ({
 
   const isUrgent = timeLeftSec < 300; // < 5 mins
 
+  if (isSubmitting) {
+    return (
+      <LoadingScreen
+        mode="fullscreen"
+        title="Finalizing Examination & Cryptographic Attestation"
+        subtitle="Compiling behavioral telemetry, sealing answers, and recording institutional evaluation..."
+        phases={[
+          'Flushing telemetry event buffer to immutable audit stream...',
+          'Running keystroke & cadence anomaly analysis...',
+          'Attesting submission timestamp against server authority...',
+          'Submission recorded • Generating examination report',
+        ]}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col">
       {/* Top Authoritative Exam Header */}
       <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-30 px-4 sm:px-6 h-14 flex items-center justify-between shadow-xs">
         <div className="flex items-center gap-3">
-          <div className="w-7 h-7 rounded bg-slate-900 text-white flex items-center justify-center font-bold text-xs">
+          <div className="hidden sm:flex items-center pr-2 border-r border-slate-200 dark:border-slate-800">
+            <LogoIcon size={24} />
+          </div>
+          <div className="w-7 h-7 rounded bg-indigo-600 text-white flex items-center justify-center font-bold text-xs shadow-xs">
             {currentQIndex + 1}
           </div>
           <div>

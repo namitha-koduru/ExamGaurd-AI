@@ -7,6 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../services/api';
 import { Institution } from '../../types';
+import { Logo } from '../../components/common/Logo';
 import {
   Building2,
   Lock,
@@ -115,18 +116,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onNavigate }) => {
           <span>Return to Institutional Home</span>
         </button>
 
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold text-sm shadow-xs">
-            EG
-          </div>
-          <div>
-            <span className="font-bold text-lg tracking-tight text-slate-900 dark:text-white block leading-none">
-              ExamGuard AI
-            </span>
-            <span className="text-[11px] font-medium text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">
-              Institutional Examination Portal
-            </span>
-          </div>
+        <div className="mb-4">
+          <Logo size={42} subtitle="Institutional Examination Portal" />
         </div>
 
         <h1 className="mt-5 text-xl font-bold tracking-tight text-slate-900 dark:text-white">

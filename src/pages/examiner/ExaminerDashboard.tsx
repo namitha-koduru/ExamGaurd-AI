@@ -3,6 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { ExamSession, Exam, RiskLevel } from '../../types';
 import { api } from '../../services/api';
 import { RiskBadge, StatusBadge } from '../../components/common/Badge';
+import { LoadingScreen } from '../../components/common/LoadingScreen';
 import {
   Activity,
   AlertTriangle,
@@ -180,6 +181,24 @@ export const ExaminerDashboard: React.FC<ExaminerDashboardProps> = ({
     const matchesStatus = statusFilter === 'ALL' || s.status === statusFilter;
     return matchesSearch && matchesRisk && matchesStatus;
   });
+
+  if (loading && sessions.length === 0 && exams.length === 0) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 py-16">
+        <LoadingScreen
+          mode="inline"
+          title="Connecting to Proctoring Telemetry Feed"
+          subtitle="Loading active examination sessions, candidate cohort rosters, and live audit telemetry..."
+          phases={[
+            'Connecting to server-sent event (SSE) telemetry stream...',
+            'Querying tenant examination submissions and active timers...',
+            'Compiling real-time behavioral anomaly distribution...',
+            'Examiner command center ready • Streaming telemetry',
+          ]}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 space-y-6">

@@ -3,6 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { api } from '../../services/api';
 import { Exam, ExamSession } from '../../types';
 import { StatusBadge, RiskBadge } from '../../components/common/Badge';
+import { LoadingScreen } from '../../components/common/LoadingScreen';
 import {
   BookOpen,
   Clock,
@@ -99,8 +100,18 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
 
   if (loading) {
     return (
-      <div className="py-20 text-center text-slate-500 text-sm">
-        Loading institutional examination portal...
+      <div className="max-w-6xl mx-auto px-4 py-12">
+        <LoadingScreen
+          mode="inline"
+          title="Loading Examination Portal"
+          subtitle="Retrieving scheduled examinations and candidate records..."
+          phases={[
+            'Fetching institution examination catalog...',
+            'Verifying single-attempt authorization and deadlines...',
+            'Calibrating client telemetry compatibility...',
+            'Portal ready • Examinations loaded',
+          ]}
+        />
       </div>
     );
   }

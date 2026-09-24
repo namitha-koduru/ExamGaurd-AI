@@ -1,0 +1,241 @@
+import sharp from 'sharp';
+import fs from 'fs';
+import path from 'path';
+
+const publicDir = path.resolve('public');
+if (!fs.existsSync(publicDir)) {
+  fs.mkdirSync(publicDir, { recursive: true });
+}
+
+// High-fidelity SVG representing the ExamGuard institutional identity:
+// Academic Mortarboard Graduation Cap + Protective Institutional Shield + Biometric AI Proctoring Core
+const masterSvg = `
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Background Radiant Aura -->
+    <radialGradient id="ambient-glow" cx="50%" cy="45%" r="50%">
+      <stop offset="0%" stop-color="#38BDF8" stop-opacity="0.3" />
+      <stop offset="60%" stop-color="#4F46E5" stop-opacity="0.1" />
+      <stop offset="100%" stop-color="#0F172A" stop-opacity="0" />
+    </radialGradient>
+
+    <!-- Main Outer Shield Gradient -->
+    <linearGradient id="shield-grad" x1="100" y1="40" x2="412" y2="480" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#4F46E5" />
+      <stop offset="35%" stop-color="#2563EB" />
+      <stop offset="75%" stop-color="#0284C7" />
+      <stop offset="100%" stop-color="#0369A1" />
+    </linearGradient>
+
+    <!-- 3D Bevel Shadow Left Half -->
+    <linearGradient id="shield-facet" x1="256" y1="40" x2="100" y2="480" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#1E1B4B" stop-opacity="0.85" />
+      <stop offset="100%" stop-color="#0F172A" stop-opacity="0.95" />
+    </linearGradient>
+
+    <!-- Cap & Crest Gradient -->
+    <linearGradient id="cap-grad" x1="160" y1="110" x2="352" y2="240" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FFFFFF" />
+      <stop offset="50%" stop-color="#E2E8F0" />
+      <stop offset="100%" stop-color="#CBD5E1" />
+    </linearGradient>
+
+    <!-- Tassel Gold Accent -->
+    <linearGradient id="gold-tassel" x1="330" y1="160" x2="360" y2="250" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FDE047" />
+      <stop offset="50%" stop-color="#EAB308" />
+      <stop offset="100%" stop-color="#CA8A04" />
+    </linearGradient>
+
+    <!-- Biometric Core Radiant Gradient -->
+    <linearGradient id="core-glow" x1="190" y1="260" x2="322" y2="380" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#38BDF8" />
+      <stop offset="50%" stop-color="#06B6D4" />
+      <stop offset="100%" stop-color="#10B981" />
+    </linearGradient>
+
+    <radialGradient id="pupil-glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#FFFFFF" />
+      <stop offset="40%" stop-color="#38BDF8" />
+      <stop offset="100%" stop-color="#0284C7" stop-opacity="0.8" />
+    </radialGradient>
+
+    <!-- Drop Shadow Filter -->
+    <filter id="shield-shadow" x="-10%" y="-10%" width="120%" height="125%">
+      <feDropShadow dx="0" dy="16" stdDeviation="20" flood-color="#0F172A" flood-opacity="0.5" />
+    </filter>
+  </defs>
+
+  <!-- Ambient Glow -->
+  <circle cx="256" cy="256" r="230" fill="url(#ambient-glow)" />
+
+  <!-- Outer Protective Shield -->
+  <path
+    d="M256 36 L432 100 C432 256 358 398 256 476 C154 398 80 256 80 100 L256 36 Z"
+    fill="url(#shield-grad)"
+    filter="url(#shield-shadow)"
+  />
+
+  <!-- 3D Bevel Facet on Left Half -->
+  <path
+    d="M256 36 L80 100 C80 256 154 398 256 476 V36 Z"
+    fill="url(#shield-facet)"
+  />
+
+  <!-- Shield Inner Border Highlight -->
+  <path
+    d="M256 64 L404 118 C404 248 340 372 256 442 C172 372 108 248 108 118 L256 64 Z"
+    stroke="rgba(255, 255, 255, 0.35)"
+    stroke-width="6"
+    fill="none"
+  />
+
+  <!-- Inner Dark Enclave Background -->
+  <path
+    d="M256 80 L388 128 C388 238 330 350 256 414 C182 350 124 238 124 128 L256 80 Z"
+    fill="#0B1329"
+    fill-opacity="0.85"
+  />
+
+  <!-- Concentric Biometric Radar Rings -->
+  <circle
+    cx="256"
+    cy="296"
+    r="92"
+    stroke="rgba(56, 189, 248, 0.25)"
+    stroke-width="3"
+    stroke-dasharray="12 12"
+    fill="none"
+  />
+  <circle
+    cx="256"
+    cy="296"
+    r="68"
+    stroke="rgba(255, 255, 255, 0.12)"
+    stroke-width="2"
+    fill="none"
+  />
+
+  <!-- Academic Mortarboard Graduation Cap (Top Emblem) -->
+  <!-- Cap Diamond Rhombus Top -->
+  <polygon
+    points="256,128 376,168 256,208 136,168"
+    fill="url(#cap-grad)"
+    stroke="#FFFFFF"
+    stroke-width="4"
+    stroke-linejoin="round"
+  />
+  <!-- Cap Underside / Skullcap -->
+  <path
+    d="M192 190 V216 C192 238 220 254 256 254 C292 254 320 238 320 216 V190"
+    fill="#CBD5E1"
+    stroke="#94A3B8"
+    stroke-width="3"
+  />
+  <!-- Button on Top of Cap -->
+  <circle cx="256" cy="168" r="7" fill="#EAB308" />
+  <!-- Tassel Ribbon & Drop -->
+  <path
+    d="M256 168 Q312 180 348 206 L348 244"
+    stroke="url(#gold-tassel)"
+    stroke-width="5"
+    stroke-linecap="round"
+    fill="none"
+  />
+  <polygon
+    points="344,242 352,242 354,258 342,258"
+    fill="#EAB308"
+  />
+
+  <!-- Biometric Proctoring Eye / Integrity Aperture (Central Lower Shield) -->
+  <!-- Eye Outer Contour (Vigilant AI Sentry) -->
+  <path
+    d="M172 296 C198 252 314 252 340 296 C314 340 198 340 172 296 Z"
+    fill="rgba(15, 23, 42, 0.85)"
+    stroke="url(#core-glow)"
+    stroke-width="6"
+    stroke-linejoin="round"
+  />
+
+  <!-- Glowing Iris -->
+  <circle cx="256" cy="296" r="32" fill="url(#core-glow)" />
+
+  <!-- Pupil & Core Spark -->
+  <circle cx="256" cy="296" r="16" fill="#0B1329" />
+  <circle cx="256" cy="296" r="10" fill="url(#pupil-glow)" />
+  <circle cx="251" cy="291" r="4" fill="#FFFFFF" />
+
+  <!-- Security Verification Node & Circuit Links -->
+  <line x1="256" y1="334" x2="256" y2="368" stroke="#38BDF8" stroke-width="4" stroke-linecap="round" />
+  <circle cx="256" cy="374" r="6" fill="#10B981" stroke="#FFFFFF" stroke-width="2" />
+  
+  <line x1="172" y1="296" x2="148" y2="296" stroke="rgba(56, 189, 248, 0.6)" stroke-width="3" stroke-linecap="round" />
+  <line x1="340" y1="296" x2="364" y2="296" stroke="rgba(56, 189, 248, 0.6)" stroke-width="3" stroke-linecap="round" />
+
+  <!-- Active Sentinel Status Indicator (Top Right) -->
+  <circle cx="376" cy="120" r="12" fill="#10B981" />
+  <circle cx="376" cy="120" r="6" fill="#FFFFFF" />
+</svg>
+`;
+
+async function build() {
+  console.log('Generating ExamGuard brand assets...');
+
+  // 1. Save master SVG to public/favicon.svg
+  fs.writeFileSync(path.join(publicDir, 'favicon.svg'), masterSvg.trim());
+  console.log('Saved favicon.svg');
+
+  // 2. Generate high-res ExamGaurd.png (512x512)
+  const svgBuffer = Buffer.from(masterSvg);
+  await sharp(svgBuffer)
+    .resize(512, 512)
+    .png()
+    .toFile(path.join(publicDir, 'ExamGaurd.png'));
+  console.log('Generated ExamGaurd.png (512x512)');
+
+  // 3. Generate ExamGuard.png (standard spelling copy)
+  fs.copyFileSync(
+    path.join(publicDir, 'ExamGaurd.png'),
+    path.join(publicDir, 'ExamGuard.png')
+  );
+  console.log('Generated ExamGuard.png');
+
+  // 4. Generate logo.png
+  fs.copyFileSync(
+    path.join(publicDir, 'ExamGaurd.png'),
+    path.join(publicDir, 'logo.png')
+  );
+  console.log('Generated logo.png');
+
+  // 5. Generate favicon.png (64x64) and touch icon (180x180)
+  await sharp(svgBuffer)
+    .resize(64, 64)
+    .png()
+    .toFile(path.join(publicDir, 'favicon.png'));
+  console.log('Generated favicon.png (64x64)');
+
+  await sharp(svgBuffer)
+    .resize(32, 32)
+    .png()
+    .toFile(path.join(publicDir, 'favicon-32x32.png'));
+
+  await sharp(svgBuffer)
+    .resize(180, 180)
+    .png()
+    .toFile(path.join(publicDir, 'apple-touch-icon.png'));
+  console.log('Generated apple-touch-icon.png (180x180)');
+
+  // 6. Also generate favicon.ico using 32x32 png
+  fs.copyFileSync(
+    path.join(publicDir, 'favicon-32x32.png'),
+    path.join(publicDir, 'favicon.ico')
+  );
+  console.log('Generated favicon.ico');
+
+  console.log('All brand identity image assets successfully created!');
+}
+
+build().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

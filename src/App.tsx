@@ -19,12 +19,14 @@ import { SessionDetail } from './pages/examiner/SessionDetail';
 import { AnalyticsView } from './pages/examiner/AnalyticsView';
 import { CreateExamModal } from './pages/examiner/CreateExamModal';
 import { PrivacyPage } from './pages/PrivacyPage';
+import { LoadingScreen } from './components/common/LoadingScreen';
 import { api } from './services/api';
 import { Exam, ExamSession, Question } from './types';
 
 function MainApp() {
   const { user, isLoading } = useAuth();
   const [currentTab, setCurrentTab] = useState<string>('home');
+  const [isPreparingExam, setIsPreparingExam] = useState<boolean>(false);
 
   // Student flow state
   const [selectedExam, setSelectedExam] = useState<Exam | null>(null);
@@ -60,15 +62,24 @@ function MainApp() {
   };
 
   const handleStartExamSession = async (examId: string, accessCode?: string) => {
-    const codeToUse = accessCode || validatedAccessCode;
-    const [startRes, examRes] = await Promise.all([
-      api.startExam(examId, codeToUse),
-      api.getExam(examId),
-    ]);
-    setActiveSession(startRes.session);
-    setSessionQuestions(examRes.questions);
-    setSelectedExam(examRes.exam);
-    setCurrentTab('exam-active');
+    setIsPreparingExam(true);
+    try {
+      const codeToUse = accessCode || validatedAccessCode;
+      const [startRes, examRes] = await Promise.all([
+        api.startExam(examId, codeToUse),
+        api.getExam(examId),
+      ]);
+      // Brief aesthetic pause to ensure student feels the calibration & sandbox setup
+      await new Promise((r) => setTimeout(r, 600));
+      setActiveSession(startRes.session);
+      setSessionQuestions(examRes.questions);
+      setSelectedExam(examRes.exam);
+      setCurrentTab('exam-active');
+    } catch (err) {
+      console.error('Failed to start session:', err);
+    } finally {
+      setIsPreparingExam(false);
+    }
   };
 
   const handleExamSubmitSuccess = (session: ExamSession) => {
@@ -86,9 +97,33 @@ function MainApp() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center text-slate-500 text-xs font-mono">
-        Initializing Institutional Verification Engine...
-      </div>
+      <LoadingScreen
+        mode="fullscreen"
+        title="ExamGuard AI"
+        subtitle="Initializing Institutional Verification Engine & Behavioral Telemetry Core..."
+        phases={[
+          'Calibrating non-invasive behavioral biometrics engine...',
+          'Verifying institutional multi-tenant isolation boundaries...',
+          'Synchronizing tamper-evident keystroke & focus telemetry...',
+          'Institutional integrity protocol armed • System nominal',
+        ]}
+      />
+    );
+  }
+
+  if (isPreparingExam) {
+    return (
+      <LoadingScreen
+        mode="fullscreen"
+        title="Arming Examination Environment"
+        subtitle={`Calibrating behavioral telemetry for ${selectedExam?.title || 'Examination'}...`}
+        phases={[
+          'Locking browser focus boundary & preparing sandbox...',
+          'Arming non-invasive keystroke & cadence telemetry...',
+          'Verifying cryptographic examination token & synchronized clock...',
+          'Session ready • Launching examination interface',
+        ]}
+      />
     );
   }
 

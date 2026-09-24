@@ -5,6 +5,7 @@
 
 import React from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { Logo } from './Logo';
 import {
   ShieldCheck,
   Activity,
@@ -62,21 +63,10 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, onSelectTab }) => {
         <div className="flex items-center justify-between h-15">
           {/* Brand Logo & Name */}
           <div
-            className="flex items-center gap-3 cursor-pointer select-none"
+            className="cursor-pointer select-none"
             onClick={() => onSelectTab(user ? (isExaminer ? 'examiner-dashboard' : 'student-exams') : 'home')}
           >
-            <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-sm shadow-xs">
-              EG
-            </div>
-            <div>
-              <div className="font-extrabold text-sm tracking-tight text-slate-900 dark:text-white flex items-center gap-1.5">
-                ExamGuard AI
-                <span className="text-[10px] font-mono font-medium px-1.5 py-0.2 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
-                  Institutional
-                </span>
-              </div>
-              <div className="text-[10px] text-slate-500 font-medium">Academic Integrity & Anomaly Engine</div>
-            </div>
+            <Logo size={32} subtitle="Academic Integrity & Anomaly Engine" />
           </div>
 
           {/* Active Institution Badge */}

@@ -6,6 +6,7 @@
 
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
+import { Logo, LogoIcon } from '../components/common/Logo';
 import {
   ShieldCheck,
   Lock,
@@ -35,75 +36,142 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans">
       {/* Hero Section */}
-      <section className="relative overflow-hidden border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 pt-16 pb-20 md:pt-24 md:pb-28">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="max-w-3xl space-y-6">
-            <div className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-indigo-700 dark:text-indigo-400">
-              <span className="w-2 h-2 rounded-full bg-indigo-600 dark:bg-indigo-400"></span>
-              <span>Institutional Examination Platform · Multi-Tenant Architecture</span>
-            </div>
+      <section className="relative overflow-hidden border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 pt-14 pb-18 md:pt-20 md:pb-24">
+        {/* Ambient subtle background glow */}
+        <div className="absolute -top-24 right-1/4 w-96 h-96 rounded-full bg-indigo-500/10 dark:bg-indigo-500/15 blur-3xl pointer-events-none" />
 
-            <h1 className="text-3xl sm:text-5xl font-black text-slate-900 dark:text-white tracking-tight leading-[1.15]">
-              Continuous Behavioral Biometrics for Academic Integrity
-            </h1>
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
+            {/* Left Column: Brief and CTAs */}
+            <div className="lg:col-span-7 space-y-6">
+              <div className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-indigo-700 dark:text-indigo-400">
+                <span className="w-2 h-2 rounded-full bg-indigo-600 dark:bg-indigo-400 animate-ping"></span>
+                <span>Institutional Examination Platform · Multi-Tenant Architecture</span>
+              </div>
 
-            <p className="text-base sm:text-lg text-slate-600 dark:text-slate-300 leading-relaxed font-normal">
-              ExamGuard AI is an institutional examination platform that enables educational organizations to create, schedule, conduct, evaluate, and monitor secure online examinations with privacy-conscious behavioral intelligence.
-            </p>
+              <h1 className="text-3xl sm:text-5xl font-black text-slate-900 dark:text-white tracking-tight leading-[1.15]">
+                Continuous Behavioral Biometrics for Academic Integrity
+              </h1>
 
-            {/* Primary Action Buttons */}
-            <div className="pt-4 flex flex-wrap items-center gap-3">
-              {user ? (
-                <button
-                  onClick={() =>
-                    onNavigate(user.role === 'STUDENT' ? 'student-exams' : 'examiner-dashboard')
-                  }
-                  className="py-3 px-6 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm transition-colors shadow-sm flex items-center gap-2"
-                >
-                  <span>Go to My Dashboard ({user.role === 'STUDENT' ? 'Student Portal' : 'Examiner Console'})</span>
-                  <ArrowRight className="w-4 h-4" />
-                </button>
-              ) : (
-                <>
+              <p className="text-base sm:text-lg text-slate-600 dark:text-slate-300 leading-relaxed font-normal">
+                ExamGuard AI is an institutional examination platform that enables educational organizations to create, schedule, conduct, evaluate, and monitor secure online examinations with privacy-conscious behavioral intelligence.
+              </p>
+
+              {/* Primary Action Buttons */}
+              <div className="pt-2 flex flex-wrap items-center gap-3">
+                {user ? (
                   <button
-                    onClick={() => onNavigate('login')}
-                    className="py-3 px-6 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm transition-colors shadow-sm flex items-center gap-2"
+                    onClick={() =>
+                      onNavigate(user.role === 'STUDENT' ? 'student-exams' : 'examiner-dashboard')
+                    }
+                    className="py-3 px-6 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm transition-colors shadow-sm flex items-center gap-2 cursor-pointer"
                   >
-                    <span>Sign In to Institutional Portal</span>
+                    <span>Go to My Dashboard ({user.role === 'STUDENT' ? 'Student Portal' : 'Examiner Console'})</span>
                     <ArrowRight className="w-4 h-4" />
                   </button>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => onNavigate('login')}
+                      className="py-3 px-6 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm transition-colors shadow-sm flex items-center gap-2 cursor-pointer"
+                    >
+                      <span>Sign In to Institutional Portal</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
 
-                  <button
-                    onClick={() => onNavigate('register')}
-                    className="py-3 px-6 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-900 dark:text-white font-semibold text-sm transition-colors shadow-2xs"
-                  >
-                    Create Account
-                  </button>
-                </>
-              )}
+                    <button
+                      onClick={() => onNavigate('register')}
+                      className="py-3 px-6 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-900 dark:text-white font-semibold text-sm transition-colors shadow-2xs cursor-pointer"
+                    >
+                      Create Account
+                    </button>
+                  </>
+                )}
 
-              <button
-                onClick={() => onNavigate('privacy')}
-                className="py-3 px-4 text-xs font-semibold text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors flex items-center gap-1.5"
-              >
-                <EyeOff className="w-4 h-4 text-slate-400" />
-                <span>Privacy & Non-Invasive Charter</span>
-              </button>
+                <button
+                  onClick={() => onNavigate('privacy')}
+                  className="py-3 px-4 text-xs font-semibold text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors flex items-center gap-1.5 cursor-pointer"
+                >
+                  <EyeOff className="w-4 h-4 text-slate-400" />
+                  <span>Privacy & Non-Invasive Charter</span>
+                </button>
+              </div>
+
+              {/* Institutional Trust Indicators */}
+              <div className="pt-6 border-t border-slate-100 dark:border-slate-800/80 flex flex-wrap items-center gap-x-8 gap-y-3 text-xs text-slate-500">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                  <span>Zero Webcam / Audio Recording</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Cpu className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                  <span>In-Process Isolation Forest AI</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Lock className="w-4 h-4 text-slate-600 dark:text-slate-400" />
+                  <span>Single-Attempt Deadline Enforcement</span>
+                </div>
+              </div>
             </div>
 
-            {/* Institutional Trust Indicators */}
-            <div className="pt-8 border-t border-slate-100 dark:border-slate-800/80 flex flex-wrap items-center gap-x-8 gap-y-3 text-xs text-slate-500">
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                <span>Zero Webcam / Audio Recording</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Cpu className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                <span>In-Process Isolation Forest AI</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Lock className="w-4 h-4 text-slate-600 dark:text-slate-400" />
-                <span>Single-Attempt Deadline Enforcement</span>
+            {/* Right Column: Innovative ExamGuard AI Emblem & Real-Time Integrity Shield Card */}
+            <div className="lg:col-span-5 flex justify-center">
+              <div className="relative w-full max-w-sm rounded-2xl bg-gradient-to-b from-slate-900 to-slate-950 p-6 text-white border border-slate-800 shadow-2xl overflow-hidden">
+                {/* Orbital scan rings backdrop */}
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 rounded-full bg-indigo-600/10 blur-xl pointer-events-none" />
+
+                {/* Header of the Card */}
+                <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-5">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                    <span className="font-mono text-[10px] uppercase tracking-wider text-slate-400">
+                      Behavioral Sentinel
+                    </span>
+                  </div>
+                  <span className="font-mono text-[10px] text-indigo-400 bg-indigo-950/80 px-2 py-0.5 rounded border border-indigo-800/60">
+                    V3.2 Active
+                  </span>
+                </div>
+
+                {/* Central Emblem Showcase */}
+                <div className="relative py-4 flex flex-col items-center justify-center text-center">
+                  <div className="relative w-28 h-28 flex items-center justify-center mb-3">
+                    {/* Concentric SVG radar */}
+                    <svg className="absolute inset-0 w-full h-full animate-spin" style={{ animationDuration: '14s' }} viewBox="0 0 100 100">
+                      <circle cx="50" cy="50" r="46" stroke="#6366F1" strokeWidth="1.5" strokeDasharray="6 6" fill="none" opacity="0.4" />
+                    </svg>
+                    <svg className="absolute inset-0 w-full h-full animate-spin" style={{ animationDuration: '9s', animationDirection: 'reverse' }} viewBox="0 0 100 100">
+                      <circle cx="50" cy="50" r="38" stroke="#06B6D4" strokeWidth="1.2" strokeDasharray="3 5" fill="none" opacity="0.35" />
+                    </svg>
+
+                    <div className="relative z-10 drop-shadow-xl">
+                      <LogoIcon size={64} animate />
+                    </div>
+                  </div>
+
+                  <h4 className="font-extrabold text-base tracking-tight text-white flex items-center gap-1.5">
+                    ExamGuard AI
+                    <span className="text-[10px] font-mono text-cyan-300 font-semibold uppercase">Security Core</span>
+                  </h4>
+                  <p className="text-[11px] text-slate-400 mt-1 max-w-xs">
+                    Non-invasive behavioral anomaly detection & institutional examination firewall
+                  </p>
+                </div>
+
+                {/* Live Micro Status Chips */}
+                <div className="mt-4 pt-3 border-t border-slate-800/80 grid grid-cols-2 gap-2 text-[10px] font-mono">
+                  <div className="bg-slate-900/90 rounded-lg p-2 border border-slate-800">
+                    <span className="text-slate-500 block text-[9px]">ENCLAVE INTEGRITY</span>
+                    <span className="text-emerald-400 font-semibold flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                      Continuous Active
+                    </span>
+                  </div>
+                  <div className="bg-slate-900/90 rounded-lg p-2 border border-slate-800">
+                    <span className="text-slate-500 block text-[9px]">DATA ISOLATION</span>
+                    <span className="text-indigo-400 font-semibold">Tenant-Scoped</span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -333,12 +401,12 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
       </section>
 
       {/* Footer */}
-      <footer className="mt-auto border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 py-10 text-xs text-slate-500">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <span className="font-bold text-slate-900 dark:text-white">ExamGuard AI</span>
-            <span>·</span>
-            <span>Institutional Examination & Integrity Standard</span>
+      <footer className="mt-auto border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 py-8 text-xs text-slate-500">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-6">
+          <div className="flex items-center gap-3">
+            <Logo size={28} subtitle={false} />
+            <span className="text-slate-300 dark:text-slate-700">|</span>
+            <span className="text-[11px] text-slate-500">Institutional Examination & Integrity Standard</span>
           </div>
 
           <div className="flex items-center gap-6">
