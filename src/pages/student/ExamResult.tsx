@@ -18,6 +18,7 @@ import {
   Key,
   Check,
   XCircle,
+  AlertTriangle,
 } from 'lucide-react';
 
 interface ExamResultProps {
@@ -28,6 +29,7 @@ interface ExamResultProps {
 export const ExamResult: React.FC<ExamResultProps> = ({ session, onReturnDashboard }) => {
   const answeredCount = Object.keys(session.answers || {}).length;
   const features = session.features;
+  const isTabSwitchTerminated = session.terminatedReason === 'TAB_SWITCH_DETECTED';
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-10 text-center space-y-6">
@@ -35,18 +37,45 @@ export const ExamResult: React.FC<ExamResultProps> = ({ session, onReturnDashboa
         <Logo size={36} subtitle={session.institutionName || 'Institutional Academic Registry'} />
       </div>
 
-      <div className="w-14 h-14 bg-emerald-100 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 rounded-full flex items-center justify-center mx-auto text-emerald-600 dark:text-emerald-400">
-        <CheckCircle2 className="w-7 h-7" />
+      <div
+        className={`w-14 h-14 rounded-full flex items-center justify-center mx-auto border ${
+          isTabSwitchTerminated
+            ? 'bg-rose-100 dark:bg-rose-950/60 border-rose-300 dark:border-rose-800 text-rose-600 dark:text-rose-400'
+            : 'bg-emerald-100 dark:bg-emerald-950/60 border-emerald-300 dark:border-emerald-800 text-emerald-600 dark:text-emerald-400'
+        }`}
+      >
+        {isTabSwitchTerminated ? <AlertTriangle className="w-7 h-7" /> : <CheckCircle2 className="w-7 h-7" />}
       </div>
 
       <div>
         <h1 className="text-xl font-bold text-slate-900 dark:text-white">
-          Examination Submitted Successfully
+          {isTabSwitchTerminated ? 'Examination Ended: Tab Switch Detected' : 'Examination Submitted Successfully'}
         </h1>
         <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
-          Your responses for <strong>{session.examTitle}</strong> have been evaluated and recorded in the institutional registry.
+          {isTabSwitchTerminated ? (
+            <>
+              Your examination for <strong>{session.examTitle}</strong> was terminated immediately due to a tab switch. Responses recorded up to the violation have been sealed and filed.
+            </>
+          ) : (
+            <>
+              Your responses for <strong>{session.examTitle}</strong> have been evaluated and recorded in the institutional registry.
+            </>
+          )}
         </p>
       </div>
+
+      {/* Tab Switch Policy Violation Banner */}
+      {isTabSwitchTerminated && (
+        <div className="bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 rounded-2xl p-4 text-left space-y-1.5 max-w-md mx-auto">
+          <div className="flex items-center gap-2 text-rose-700 dark:text-rose-400 font-bold text-xs">
+            <AlertTriangle className="w-4 h-4 shrink-0" />
+            <span>Tab Switch Violation Recorded</span>
+          </div>
+          <p className="text-[11px] text-rose-600 dark:text-rose-300 leading-relaxed">
+            Institutional integrity policy strictly requires remaining in the examination environment in full screen. When a tab switch or window focus deviation was detected, the session was automatically ended and flagged for faculty review.
+          </p>
+        </div>
+      )}
 
       {/* Main Score & Academic Result Card */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 text-left text-xs space-y-4 max-w-md mx-auto shadow-sm">
@@ -64,8 +93,12 @@ export const ExamResult: React.FC<ExamResultProps> = ({ session, onReturnDashboa
             <span className="text-lg font-bold font-mono text-slate-800 dark:text-slate-200">
               {session.scorePercentage ?? (session.maxScore ? Math.round(((session.score || 0) / session.maxScore) * 100) : 0)}%
             </span>
-            <span className="text-[10px] text-emerald-600 dark:text-emerald-400 block font-medium">
-              Completed
+            <span
+              className={`text-[10px] block font-medium ${
+                isTabSwitchTerminated ? 'text-rose-600 dark:text-rose-400 font-bold' : 'text-emerald-600 dark:text-emerald-400'
+              }`}
+            >
+              {isTabSwitchTerminated ? 'Terminated (Tab Switch)' : 'Completed'}
             </span>
           </div>
         </div>

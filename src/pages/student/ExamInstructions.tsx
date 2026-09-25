@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Exam } from '../../types';
 import { api } from '../../services/api';
 import { Logo } from '../../components/common/Logo';
-import { Check, AlertCircle, ShieldCheck, Clock, FileText, ArrowRight, ArrowLeft, RefreshCw, Chrome } from 'lucide-react';
+import { Check, AlertCircle, ShieldCheck, Clock, FileText, ArrowRight, ArrowLeft, RefreshCw, Maximize2, AlertTriangle } from 'lucide-react';
 
 interface ExamInstructionsProps {
   exam: Exam;
@@ -18,6 +18,7 @@ export const ExamInstructions: React.FC<ExamInstructionsProps> = ({
   onStartExam,
 }) => {
   const [browserOk, setBrowserOk] = useState<boolean>(true);
+  const [fullscreenSupported, setFullscreenSupported] = useState<boolean>(true);
   const [sensorOk, setSensorOk] = useState<boolean>(true);
   const [serverOk, setServerOk] = useState<boolean>(false);
   const [sessionReady, setSessionReady] = useState<boolean>(false);
@@ -30,11 +31,19 @@ export const ExamInstructions: React.FC<ExamInstructionsProps> = ({
     const isModern = typeof window !== 'undefined' && 'localStorage' in window;
     setBrowserOk(isModern);
 
-    // 2. In-browser behavioral sensor check (No extension required)
+    // 2. Fullscreen capability check
+    const hasFullscreen = typeof window !== 'undefined' && Boolean(
+      document.fullscreenEnabled ||
+      (document as any).webkitFullscreenEnabled ||
+      document.documentElement?.requestFullscreen
+    );
+    setFullscreenSupported(Boolean(hasFullscreen));
+
+    // 3. In-browser behavioral sensor check (No extension required)
     const hasWebApis = typeof window !== 'undefined' && 'addEventListener' in window;
     setSensorOk(hasWebApis);
 
-    // 3. Backend connectivity
+    // 4. Backend connectivity
     try {
       const res = await fetch('/api/health');
       setServerOk(res.ok);
@@ -42,7 +51,7 @@ export const ExamInstructions: React.FC<ExamInstructionsProps> = ({
       setServerOk(false);
     }
 
-    // 4. Session preparation
+    // 5. Session preparation
     setSessionReady(true);
     setChecking(false);
   };
@@ -53,6 +62,15 @@ export const ExamInstructions: React.FC<ExamInstructionsProps> = ({
 
   const handleStart = async () => {
     setStarting(true);
+    // Request fullscreen immediately from the user click gesture
+    try {
+      if (document.documentElement && !document.fullscreenElement) {
+        await document.documentElement.requestFullscreen().catch(() => {});
+      }
+    } catch {
+      // Browsers may handle full screen in interface
+    }
+
     try {
       await onStartExam(exam.id, accessCode);
     } catch (err) {
@@ -125,6 +143,22 @@ export const ExamInstructions: React.FC<ExamInstructionsProps> = ({
         </p>
       </div>
 
+      {/* Fullscreen & Tab Switch Rule Enforcement Banner */}
+      <div className="p-4 rounded-lg bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/60 text-xs space-y-2">
+        <div className="flex items-center gap-2 font-semibold text-rose-900 dark:text-rose-300">
+          <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+          <span>Strict Examination Rules: Fullscreen Access & Tab Switching</span>
+        </div>
+        <ul className="text-rose-800/90 dark:text-rose-300/90 list-disc list-inside space-y-1 text-[11px] leading-relaxed">
+          <li>
+            <strong>Fullscreen Access Mandatory:</strong> The examination will launch in full screen. Exiting full screen will halt test progress until re-entered.
+          </li>
+          <li>
+            <strong>Immediate Termination on Tab Switch:</strong> Switching browser tabs, switching applications, or minimizing the window will <strong>instantly end and submit your examination</strong> with zero re-entry permitted.
+          </li>
+        </ul>
+      </div>
+
       {/* System Readiness Check (Section 9 Requirement) */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 space-y-4">
         <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
@@ -173,6 +207,22 @@ export const ExamInstructions: React.FC<ExamInstructionsProps> = ({
             ) : (
               <span className="text-amber-500 font-medium flex items-center gap-1">
                 <AlertCircle className="w-3.5 h-3.5" /> Sensor Standby
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center justify-between p-2 rounded bg-slate-50 dark:bg-slate-800/50">
+            <div className="flex items-center gap-1.5 text-slate-700 dark:text-slate-300">
+              <Maximize2 className="w-3.5 h-3.5 text-indigo-500" />
+              <span>Fullscreen Environment Access</span>
+            </div>
+            {fullscreenSupported ? (
+              <span className="text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
+                <Check className="w-3.5 h-3.5" /> Fullscreen Required
+              </span>
+            ) : (
+              <span className="text-amber-500 font-medium flex items-center gap-1">
+                <AlertCircle className="w-3.5 h-3.5" /> Browser Prompted
               </span>
             )}
           </div>

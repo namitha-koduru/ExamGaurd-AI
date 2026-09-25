@@ -209,12 +209,13 @@ export const api = {
 
   async submitExam(
     sessionId: string,
-    answers: Record<string, any>
+    answers: Record<string, any>,
+    terminatedReason?: string
   ): Promise<{ session: ExamSession; anomalyReport: AnomalyReport }> {
     const res = await fetch(`${API_BASE}/sessions/${sessionId}/submit`, {
       method: 'POST',
       headers: getAuthHeaders(),
-      body: JSON.stringify({ answers }),
+      body: JSON.stringify({ answers, terminatedReason }),
     });
     if (!res.ok) throw new Error('Submission failed');
     return res.json();

@@ -117,7 +117,7 @@ router.post('/:id/submit', async (req, res) => {
       return res.status(404).json({ error: 'Session not found' });
     }
 
-    const { answers } = req.body;
+    const { answers, terminatedReason } = req.body;
     const finalAnswers = answers ? { ...session.answers, ...answers } : session.answers;
     const submittedAt = new Date().toISOString();
     const durationSeconds = Math.max(1, Math.round((Date.now() - new Date(session.startedAt).getTime()) / 1000));
@@ -131,6 +131,21 @@ router.post('/:id/submit', async (req, res) => {
     const features = extractFeaturesFromEvents(allEvents, durationSeconds, totalQ);
     const anomalyReport = calculateExplainableRisk(features, true);
     anomalyReport.sessionId = req.params.id;
+
+    if (terminatedReason === 'TAB_SWITCH_DETECTED') {
+      anomalyReport.detectedPatterns.unshift('Examination automatically terminated: Browser tab switch / window blur detected');
+      anomalyReport.contributingFactors.unshift({
+        factor: 'Unauthorized Tab Switch (Examination Ended)',
+        points: 40,
+        explanation: 'Candidate switched tabs or minimized the active examination window. Immediate session termination enforced.',
+        severity: 'high',
+        featureName: 'tab_switch_violation',
+        sessionValue: 'Tab switch detected (terminated)',
+        baselineValue: '0 tab switches (fullscreen enforced)',
+      });
+      anomalyReport.riskScore = Math.max(anomalyReport.riskScore, 85);
+      anomalyReport.riskLevel = 'HIGH_ANOMALY';
+    }
 
     // Calculate academic scores across questions
     const qCursor = await db.questions().find({ examId: session.examId });
@@ -206,6 +221,11 @@ router.post('/:id/submit', async (req, res) => {
       submittedAt,
       durationSeconds,
       status: 'SUBMITTED' as const,
+      terminatedReason: terminatedReason || undefined,
+      proctorStatus: (terminatedReason ? 'FLAGGED' : 'UNREVIEWED') as 'FLAGGED' | 'UNREVIEWED',
+      proctorNotes: terminatedReason === 'TAB_SWITCH_DETECTED'
+        ? 'Examination automatically terminated due to tab switch / window blur violation.'
+        : undefined,
       score: totalScore,
       maxScore: maxPossibleScore,
       scorePercentage,
@@ -230,9 +250,11 @@ router.post('/:id/submit', async (req, res) => {
       actorId: session.studentId,
       actorName: session.studentName,
       actorRole: 'STUDENT',
-      action: 'SESSION_SUBMITTED',
+      action: terminatedReason ? 'SESSION_TERMINATED_TAB_SWITCH' : 'SESSION_SUBMITTED',
       targetId: req.params.id,
-      details: `Session finalized with Risk Index: ${anomalyReport.riskScore} (${anomalyReport.riskLevel}).`,
+      details: terminatedReason === 'TAB_SWITCH_DETECTED'
+        ? `Session terminated immediately due to tab switch violation. Risk Index: ${anomalyReport.riskScore} (${anomalyReport.riskLevel}).`
+        : `Session finalized with Risk Index: ${anomalyReport.riskScore} (${anomalyReport.riskLevel}).`,
     });
 
     // Notify examiners via SSE

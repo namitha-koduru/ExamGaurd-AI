@@ -119,10 +119,28 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
         </button>
 
         <div className="flex items-center gap-3">
+          {session.terminatedReason === 'TAB_SWITCH_DETECTED' && (
+            <span className="px-2.5 py-1 rounded bg-rose-100 text-rose-800 dark:bg-rose-950/80 dark:text-rose-300 font-bold text-xs flex items-center gap-1 border border-rose-300 dark:border-rose-800">
+              <AlertTriangle className="w-3.5 h-3.5" />
+              Tab Switch Terminated
+            </span>
+          )}
           <StatusBadge status={session.status} />
           <RiskBadge level={session.riskLevel} score={session.riskScore} />
         </div>
       </div>
+
+      {session.terminatedReason === 'TAB_SWITCH_DETECTED' && (
+        <div className="p-4 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 rounded-lg text-xs space-y-1">
+          <div className="flex items-center gap-2 font-bold text-rose-800 dark:text-rose-300">
+            <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+            <span>Automatic Termination Event: Browser Tab Switch Detected</span>
+          </div>
+          <p className="text-rose-700 dark:text-rose-400 text-[11px] leading-relaxed">
+            The candidate switched away from the active examination browser tab or minimized the window. In accordance with institutional integrity protocol, the examination was instantly terminated and submitted with current responses.
+          </p>
+        </div>
+      )}
 
       {/* Main Student & Exam Identity Card */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-6 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-6">

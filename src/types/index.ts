@@ -305,7 +305,8 @@ export interface ExamSession {
   startedAt: string;
   submittedAt?: string;
   durationSeconds: number;
-  status: 'ACTIVE' | 'SUBMITTED' | 'EXPIRED';
+  status: 'ACTIVE' | 'SUBMITTED' | 'EXPIRED' | 'TERMINATED';
+  terminatedReason?: string;
   answers: Record<string, any>; // questionId -> value (number for MCQ, string for Descriptive, object for Coding)
   progress: number; // percentage 0 - 100
   score?: number;

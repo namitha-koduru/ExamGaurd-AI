@@ -48,6 +48,13 @@ export const ExamInterface: React.FC<ExamInterfaceProps> = ({
   const [showSubmitModal, setShowSubmitModal] = useState<boolean>(false);
   const [telemetryNotice, setTelemetryNotice] = useState<{ message: string; type: 'warn' | 'info' } | null>(null);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+  const [isTerminating, setIsTerminating] = useState<boolean>(false);
+  const [terminationReason, setTerminationReason] = useState<string | null>(null);
+
+  // Synchronized refs to avoid stale closures in window event listeners
+  const answersRef = useRef<Record<string, any>>(session.answers || {});
+  const hasTerminatedRef = useRef<boolean>(false);
+  const isArmedRef = useRef<boolean>(false);
 
   // Telemetry buffer ref & metrics
   const telemetryBuffer = useRef<Partial<BehaviorEvent>[]>([]);
@@ -67,6 +74,81 @@ export const ExamInterface: React.FC<ExamInterfaceProps> = ({
   const idleReportedForPeriod = useRef<boolean>(false);
   const qStartTime = useRef<number>(Date.now());
   const answerChangeCounts = useRef<Record<string, number>>({});
+
+  // Keep answers ref current
+  useEffect(() => {
+    answersRef.current = answers;
+  }, [answers]);
+
+  // Fullscreen initialization & arm tab switch detection after brief settling delay
+  useEffect(() => {
+    const checkFullscreen = () => {
+      const active = !!(
+        document.fullscreenElement ||
+        (document as any).webkitFullscreenElement
+      );
+      setIsFullscreen(active);
+    };
+    checkFullscreen();
+
+    // Request fullscreen upon entering exam interface
+    if (!document.fullscreenElement) {
+      const el = document.documentElement;
+      if (el.requestFullscreen) {
+        el.requestFullscreen().then(() => setIsFullscreen(true)).catch(() => {
+          // If browser restricts without click gesture, the Fullscreen Enforcement Modal will prompt
+        });
+      }
+    }
+
+    // Arm tab switch detection after 1.2s to prevent initial render / focus transitions from false-firing
+    const armTimer = setTimeout(() => {
+      isArmedRef.current = true;
+    }, 1200);
+
+    return () => clearTimeout(armTimer);
+  }, []);
+
+  // Immediate termination on tab switch or window focus deviation
+  const triggerTabSwitchTermination = async (reason: string = 'TAB_SWITCH_DETECTED') => {
+    if (!isArmedRef.current || hasTerminatedRef.current || isSubmitting) return;
+    hasTerminatedRef.current = true;
+    setIsTerminating(true);
+    setTerminationReason(reason);
+
+    recordEvent('TAB_FOCUS_LOST', {
+      reason,
+      violation: 'tab_switch_prohibited',
+      terminated: true,
+      timestamp: Date.now(),
+      questionIndex: currentQIndex,
+    });
+
+    try {
+      await flushTelemetry();
+      const currentAns = answersRef.current;
+      const res = await api.submitExam(session.id, currentAns, 'TAB_SWITCH_DETECTED');
+      if (document.fullscreenElement) {
+        document.exitFullscreen().catch(() => {});
+      }
+      setTimeout(() => {
+        onSubmitSuccess(res.session);
+      }, 1500);
+    } catch (err) {
+      console.error('Failed to submit terminated exam:', err);
+      if (document.fullscreenElement) {
+        document.exitFullscreen().catch(() => {});
+      }
+      setTimeout(() => {
+        onSubmitSuccess({
+          ...session,
+          status: 'SUBMITTED',
+          terminatedReason: 'TAB_SWITCH_DETECTED',
+          answers: answersRef.current,
+        });
+      }, 1500);
+    }
+  };
 
   // 1. Authoritative Timer synchronized with session start time
   useEffect(() => {
@@ -168,11 +250,8 @@ export const ExamInterface: React.FC<ExamInterfaceProps> = ({
         questionIndex: currentQIndex,
         questionId: questions[currentQIndex]?.id,
       });
-      setTelemetryNotice({
-        message: 'Exam window lost focus. Focus transitions are logged for instructor review.',
-        type: 'warn',
-      });
-      setTimeout(() => setTelemetryNotice(null), 4000);
+      // Window blur indicates candidate switched away from active exam window -> terminate immediately
+      triggerTabSwitchTermination('TAB_SWITCH_DETECTED');
     };
 
     const handleFocus = () => {
@@ -182,9 +261,11 @@ export const ExamInterface: React.FC<ExamInterfaceProps> = ({
     };
 
     const handleVisibility = () => {
-      if (document.hidden) {
+      if (document.hidden || document.visibilityState === 'hidden') {
         lastFocusLoss.current = Date.now();
         recordEvent('FOCUS_LOST', { reason: 'document_hidden', durationBeforeReturn: null });
+        // Tab switch detected (page hidden) -> immediately end and submit exam
+        triggerTabSwitchTermination('TAB_SWITCH_DETECTED');
       } else {
         const lostDurationMs = lastFocusLoss.current > 0 ? Date.now() - lastFocusLoss.current : 0;
         recordEvent('FOCUS_RETURNED', { lostDurationMs, durationMs: lostDurationMs, reason: 'document_visible' });
@@ -326,14 +407,17 @@ export const ExamInterface: React.FC<ExamInterfaceProps> = ({
     };
 
     const handleFullscreenChange = () => {
-      const inFullscreen = !!document.fullscreenElement;
+      const inFullscreen = !!(
+        document.fullscreenElement ||
+        (document as any).webkitFullscreenElement
+      );
       setIsFullscreen(inFullscreen);
       if (inFullscreen) {
         recordEvent('FULLSCREEN_ENTERED');
       } else {
         recordEvent('FULLSCREEN_EXITED');
         setTelemetryNotice({
-          message: 'Notice: Exited fullscreen mode. Fullscreen status is monitored.',
+          message: 'Notice: Fullscreen exited. Fullscreen mode is required to continue.',
           type: 'warn',
         });
         setTimeout(() => setTelemetryNotice(null), 4000);
@@ -350,6 +434,7 @@ export const ExamInterface: React.FC<ExamInterfaceProps> = ({
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('scroll', handleScroll, { passive: true });
     document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
 
     return () => {
       window.removeEventListener('blur', handleBlur);
@@ -362,14 +447,30 @@ export const ExamInterface: React.FC<ExamInterfaceProps> = ({
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('scroll', handleScroll);
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
     };
   }, [currentQIndex, questions]);
 
+  const enterFullscreen = () => {
+    const el = document.documentElement;
+    if (el.requestFullscreen) {
+      el.requestFullscreen().then(() => setIsFullscreen(true)).catch(() => {});
+    } else if ((el as any).webkitRequestFullscreen) {
+      (el as any).webkitRequestFullscreen();
+      setIsFullscreen(true);
+    }
+  };
+
   const toggleFullscreen = () => {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch(() => {});
+    if (!document.fullscreenElement && !(document as any).webkitFullscreenElement) {
+      enterFullscreen();
     } else {
-      document.exitFullscreen().catch(() => {});
+      if (document.exitFullscreen) {
+        document.exitFullscreen().then(() => setIsFullscreen(false)).catch(() => {});
+      } else if ((document as any).webkitExitFullscreen) {
+        (document as any).webkitExitFullscreen();
+        setIsFullscreen(false);
+      }
     }
   };
 
@@ -523,7 +624,18 @@ export const ExamInterface: React.FC<ExamInterfaceProps> = ({
         </div>
 
         {/* Controls: Fullscreen, Timer & Finish */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5">
+          <div
+            className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-medium border ${
+              isFullscreen
+                ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
+                : 'bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border-rose-200 dark:border-rose-800 animate-pulse'
+            }`}
+          >
+            <Maximize2 className="w-3 h-3" />
+            <span>{isFullscreen ? 'Fullscreen Active' : 'Fullscreen Required'}</span>
+          </div>
+
           <button
             onClick={toggleFullscreen}
             title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
@@ -779,6 +891,68 @@ export const ExamInterface: React.FC<ExamInterfaceProps> = ({
               >
                 {isSubmitting ? 'Finalizing...' : 'Yes, Submit Exam'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mandatory Fullscreen Enforcement Modal */}
+      {!isFullscreen && !isTerminating && !isSubmitting && (
+        <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-md w-full p-6 text-center space-y-4 shadow-2xl">
+            <div className="w-14 h-14 bg-indigo-100 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 rounded-full flex items-center justify-center mx-auto text-indigo-600 dark:text-indigo-400">
+              <Maximize2 className="w-7 h-7" />
+            </div>
+
+            <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+              Fullscreen Access Required
+            </h2>
+
+            <p className="text-xs text-slate-500 leading-relaxed">
+              This institutional examination requires full-screen access to maintain test integrity.
+              Please enter full-screen mode to begin or resume your examination.
+            </p>
+
+            <div className="p-3 bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/40 rounded-xl text-left text-xs text-rose-700 dark:text-rose-400 space-y-1">
+              <div className="flex items-center gap-1.5 font-bold">
+                <AlertTriangle className="w-4 h-4 shrink-0" />
+                <span>Strict Tab-Switch Rule</span>
+              </div>
+              <p className="text-[11px] leading-tight">
+                Switching browser tabs or minimizing the browser window will <strong>immediately terminate and submit</strong> your examination.
+              </p>
+            </div>
+
+            <button
+              onClick={enterFullscreen}
+              className="w-full py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs transition-colors flex items-center justify-center gap-2 shadow-sm cursor-pointer"
+            >
+              <Maximize2 className="w-4 h-4" />
+              <span>Enter Fullscreen Mode</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Immediate Tab Switch Termination Overlay */}
+      {isTerminating && (
+        <div className="fixed inset-0 z-50 bg-rose-950/95 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 border-2 border-rose-500 rounded-2xl max-w-md w-full p-6 text-center space-y-4 shadow-2xl">
+            <div className="w-16 h-16 bg-rose-100 dark:bg-rose-950/80 border-2 border-rose-500 rounded-full flex items-center justify-center mx-auto text-rose-600">
+              <AlertTriangle className="w-8 h-8 animate-bounce" />
+            </div>
+
+            <h2 className="text-xl font-black text-rose-600 dark:text-rose-400">
+              Examination Ended: Tab Switch Detected
+            </h2>
+
+            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+              You switched browser tabs or navigated away from the active examination window.
+              As per institutional integrity rules, your session has been <strong>automatically terminated</strong>.
+            </p>
+
+            <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl text-xs text-slate-500 font-mono text-center">
+              Sealing responses and transmitting final submission...
             </div>
           </div>
         </div>
