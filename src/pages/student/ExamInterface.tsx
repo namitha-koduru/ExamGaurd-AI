@@ -24,6 +24,9 @@ import {
   Code,
   FileText,
   ListFilter,
+  Monitor,
+  MonitorX,
+  ClipboardX,
 } from 'lucide-react';
 
 interface ExamInterfaceProps {
@@ -51,10 +54,17 @@ export const ExamInterface: React.FC<ExamInterfaceProps> = ({
   const [isTerminating, setIsTerminating] = useState<boolean>(false);
   const [terminationReason, setTerminationReason] = useState<string | null>(null);
 
+  // Tab switch tracking: 2 allowed with warnings, terminates on 3rd
+  const [tabSwitchCount, setTabSwitchCount] = useState<number>(0);
+  const [tabWarningModal, setTabWarningModal] = useState<{ count: number; max: number; remaining: number } | null>(null);
+  const [isMultiScreenDetected, setIsMultiScreenDetected] = useState<boolean>(false);
+
   // Synchronized refs to avoid stale closures in window event listeners
   const answersRef = useRef<Record<string, any>>(session.answers || {});
   const hasTerminatedRef = useRef<boolean>(false);
   const isArmedRef = useRef<boolean>(false);
+  const tabSwitchCountRef = useRef<number>(0);
+  const lastTabSwitchTrigger = useRef<number>(0);
 
   // Telemetry buffer ref & metrics
   const telemetryBuffer = useRef<Partial<BehaviorEvent>[]>([]);
@@ -109,16 +119,77 @@ export const ExamInterface: React.FC<ExamInterfaceProps> = ({
     return () => clearTimeout(armTimer);
   }, []);
 
-  // Immediate termination on tab switch or window focus deviation
-  const triggerTabSwitchTermination = async (reason: string = 'TAB_SWITCH_DETECTED') => {
+  // Multi-screen / external monitor detection
+  const checkMultiScreen = () => {
+    if (typeof window === 'undefined') return;
+    const isExtended = Boolean(
+      (window.screen as any)?.isExtended === true ||
+      (window.screenX < -20 || window.screenX > (window.screen.width + 20)) ||
+      (window.screenY < -20 || window.screenY > (window.screen.height + 20))
+    );
+    setIsMultiScreenDetected(isExtended);
+    if (isExtended) {
+      recordEvent('SECONDARY_SCREEN_DETECTED', {
+        screenX: window.screenX,
+        screenY: window.screenY,
+      });
+    }
+  };
+
+  useEffect(() => {
+    checkMultiScreen();
+    const screenInterval = setInterval(checkMultiScreen, 2000);
+    window.addEventListener('resize', checkMultiScreen);
+    return () => {
+      clearInterval(screenInterval);
+      window.removeEventListener('resize', checkMultiScreen);
+    };
+  }, []);
+
+  // Tab switch detected: 2 switches allowed with warnings, terminates on 3rd
+  const handleTabSwitchDetected = (reason: string) => {
     if (!isArmedRef.current || hasTerminatedRef.current || isSubmitting) return;
+    const now = Date.now();
+    // Debounce rapid duplicate blur & visibilitychange events within 1200ms
+    if (now - lastTabSwitchTrigger.current < 1200) return;
+    lastTabSwitchTrigger.current = now;
+
+    const newCount = tabSwitchCountRef.current + 1;
+    tabSwitchCountRef.current = newCount;
+    setTabSwitchCount(newCount);
+
+    recordEvent('TAB_SWITCH_DETECTED', {
+      switchCount: newCount,
+      maxAllowed: 2,
+      reason,
+      questionIndex: currentQIndex,
+    });
+
+    if (newCount > 2) {
+      // Exceeded allowed 2 tab switches -> Terminate immediately
+      triggerTabSwitchTermination('TAB_SWITCH_LIMIT_EXCEEDED');
+    } else {
+      // 1st or 2nd switch: show prominent warning modal
+      setTabWarningModal({
+        count: newCount,
+        max: 2,
+        remaining: 2 - newCount,
+      });
+    }
+  };
+
+  // Termination on exceeding tab switch limit
+  const triggerTabSwitchTermination = async (reason: string = 'TAB_SWITCH_LIMIT_EXCEEDED') => {
+    if (hasTerminatedRef.current || isSubmitting) return;
     hasTerminatedRef.current = true;
     setIsTerminating(true);
     setTerminationReason(reason);
+    setTabWarningModal(null);
 
-    recordEvent('TAB_FOCUS_LOST', {
+    recordEvent('EXAM_TERMINATED', {
       reason,
-      violation: 'tab_switch_prohibited',
+      switchCount: tabSwitchCountRef.current,
+      maxAllowed: 2,
       terminated: true,
       timestamp: Date.now(),
       questionIndex: currentQIndex,
@@ -127,13 +198,13 @@ export const ExamInterface: React.FC<ExamInterfaceProps> = ({
     try {
       await flushTelemetry();
       const currentAns = answersRef.current;
-      const res = await api.submitExam(session.id, currentAns, 'TAB_SWITCH_DETECTED');
+      const res = await api.submitExam(session.id, currentAns, reason);
       if (document.fullscreenElement) {
         document.exitFullscreen().catch(() => {});
       }
       setTimeout(() => {
         onSubmitSuccess(res.session);
-      }, 1500);
+      }, 1800);
     } catch (err) {
       console.error('Failed to submit terminated exam:', err);
       if (document.fullscreenElement) {
@@ -143,10 +214,10 @@ export const ExamInterface: React.FC<ExamInterfaceProps> = ({
         onSubmitSuccess({
           ...session,
           status: 'SUBMITTED',
-          terminatedReason: 'TAB_SWITCH_DETECTED',
+          terminatedReason: reason,
           answers: answersRef.current,
         });
-      }, 1500);
+      }, 1800);
     }
   };
 
@@ -240,6 +311,45 @@ export const ExamInterface: React.FC<ExamInterfaceProps> = ({
     }
   }, []);
 
+  const handleCopy = (e?: React.ClipboardEvent | ClipboardEvent) => {
+    if (e && e.preventDefault) e.preventDefault();
+    recordEvent('COPY_BLOCKED', {
+      questionIndex: currentQIndex,
+      questionId: questions[currentQIndex]?.id,
+    });
+    setTelemetryNotice({
+      message: 'Notice: Copying content is strictly prohibited by exam integrity policy.',
+      type: 'warn',
+    });
+    setTimeout(() => setTelemetryNotice(null), 3500);
+  };
+
+  const handleCut = (e?: React.ClipboardEvent | ClipboardEvent) => {
+    if (e && e.preventDefault) e.preventDefault();
+    recordEvent('CUT_BLOCKED', {
+      questionIndex: currentQIndex,
+      questionId: questions[currentQIndex]?.id,
+    });
+    setTelemetryNotice({
+      message: 'Notice: Cutting content is strictly prohibited by exam integrity policy.',
+      type: 'warn',
+    });
+    setTimeout(() => setTelemetryNotice(null), 3500);
+  };
+
+  const handlePaste = (e?: React.ClipboardEvent | ClipboardEvent) => {
+    if (e && e.preventDefault) e.preventDefault();
+    recordEvent('PASTE_BLOCKED', {
+      questionIndex: currentQIndex,
+      questionType: questions[currentQIndex]?.questionType,
+    });
+    setTelemetryNotice({
+      message: 'Notice: Pasting content is strictly prohibited by exam integrity policy.',
+      type: 'warn',
+    });
+    setTimeout(() => setTelemetryNotice(null), 3500);
+  };
+
   // Privacy-Preserving Window Focus, Blur, Clipboard & Typing Listeners
   useEffect(() => {
     const handleBlur = () => {
@@ -250,8 +360,8 @@ export const ExamInterface: React.FC<ExamInterfaceProps> = ({
         questionIndex: currentQIndex,
         questionId: questions[currentQIndex]?.id,
       });
-      // Window blur indicates candidate switched away from active exam window -> terminate immediately
-      triggerTabSwitchTermination('TAB_SWITCH_DETECTED');
+      // Window blur indicates candidate switched away from active exam window
+      handleTabSwitchDetected('WINDOW_BLUR');
     };
 
     const handleFocus = () => {
@@ -264,8 +374,8 @@ export const ExamInterface: React.FC<ExamInterfaceProps> = ({
       if (document.hidden || document.visibilityState === 'hidden') {
         lastFocusLoss.current = Date.now();
         recordEvent('FOCUS_LOST', { reason: 'document_hidden', durationBeforeReturn: null });
-        // Tab switch detected (page hidden) -> immediately end and submit exam
-        triggerTabSwitchTermination('TAB_SWITCH_DETECTED');
+        // Tab switch detected (page hidden)
+        handleTabSwitchDetected('DOCUMENT_HIDDEN');
       } else {
         const lostDurationMs = lastFocusLoss.current > 0 ? Date.now() - lastFocusLoss.current : 0;
         recordEvent('FOCUS_RETURNED', { lostDurationMs, durationMs: lostDurationMs, reason: 'document_visible' });
@@ -273,46 +383,27 @@ export const ExamInterface: React.FC<ExamInterfaceProps> = ({
       }
     };
 
-    const handleCopy = () => {
-      const charCount = window.getSelection()?.toString().length || 0;
-      recordEvent('COPY', {
-        estimatedCharacterCount: charCount,
-        charCount,
-        questionIndex: currentQIndex,
-      });
-      setTelemetryNotice({
-        message: 'Notice: Content copy event logged in audit stream.',
-        type: 'warn',
-      });
-      setTimeout(() => setTelemetryNotice(null), 3500);
-    };
-
-    const handleCut = () => {
-      const charCount = window.getSelection()?.toString().length || 0;
-      recordEvent('CUT', {
-        estimatedCharacterCount: charCount,
-        charCount,
-        questionIndex: currentQIndex,
-      });
-    };
-
-    const handlePaste = (e: ClipboardEvent) => {
-      const len = e.clipboardData?.getData('text')?.length || 0;
-      recordEvent('PASTE', {
-        estimatedCharacterCount: len,
-        charCount: len,
-        questionIndex: currentQIndex,
-        questionType: questions[currentQIndex]?.questionType,
-      });
-      setTelemetryNotice({
-        message: 'Notice: External clipboard paste logged.',
-        type: 'warn',
-      });
-      setTimeout(() => setTelemetryNotice(null), 3500);
-    };
-
-    // Typing behavior (Aggregated statistics only, NEVER store raw keystrokes)
-    const handleKeyDown = () => {
+    // Typing behavior & clipboard shortcut blocking
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Strictly prevent Ctrl+C, Ctrl+V, Ctrl+X, Cmd+C, Cmd+V, Cmd+X
+      if (
+        (e.ctrlKey || e.metaKey) &&
+        (e.key === 'c' || e.key === 'v' || e.key === 'x' || e.code === 'KeyC' || e.code === 'KeyV' || e.code === 'KeyX')
+      ) {
+        e.preventDefault();
+        e.stopPropagation();
+        const action = e.key === 'c' || e.code === 'KeyC' ? 'Copying' : e.key === 'x' || e.code === 'KeyX' ? 'Cutting' : 'Pasting';
+        recordEvent(
+          e.key === 'c' || e.code === 'KeyC' ? 'COPY_BLOCKED' : e.key === 'x' || e.code === 'KeyX' ? 'CUT_BLOCKED' : 'PASTE_BLOCKED',
+          { shortcut: e.code, questionIndex: currentQIndex }
+        );
+        setTelemetryNotice({
+          message: `${action} is strictly prohibited by examination integrity policy.`,
+          type: 'warn',
+        });
+        setTimeout(() => setTelemetryNotice(null), 3500);
+        return;
+      }
       const now = Date.now();
       lastInteractionTime.current = now;
       idleReportedForPeriod.current = false;
@@ -603,9 +694,14 @@ export const ExamInterface: React.FC<ExamInterfaceProps> = ({
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col">
+    <div
+      className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col select-none"
+      onCopy={handleCopy}
+      onCut={handleCut}
+      onPaste={handlePaste}
+    >
       {/* Top Authoritative Exam Header */}
-      <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-30 px-4 sm:px-6 h-14 flex items-center justify-between shadow-xs">
+      <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-30 px-3 sm:px-6 h-14 flex items-center justify-between shadow-xs">
         <div className="flex items-center gap-3">
           <div className="hidden sm:flex items-center pr-2 border-r border-slate-200 dark:border-slate-800">
             <LogoIcon size={24} />
@@ -617,14 +713,58 @@ export const ExamInterface: React.FC<ExamInterfaceProps> = ({
             <div className="font-semibold text-xs text-slate-900 dark:text-white line-clamp-1">
               {exam.title}
             </div>
-            <div className="text-[11px] text-slate-500">
+            <div className="text-[11px] text-slate-500 hidden md:block">
               Autosaved at {lastAutosaveTime} · Non-invasive behavioral telemetry active
             </div>
           </div>
         </div>
 
-        {/* Controls: Fullscreen, Timer & Finish */}
-        <div className="flex items-center gap-2.5">
+        {/* Controls: Badges, Fullscreen, Timer & Finish */}
+        <div className="flex items-center gap-2">
+          {/* Tab Switch Status Badge (2 Allowed) */}
+          <div
+            className={`hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-semibold border ${
+              tabSwitchCount === 0
+                ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
+                : tabSwitchCount === 1
+                ? 'bg-amber-50 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border-amber-200 dark:border-amber-800'
+                : 'bg-rose-50 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 border-rose-300 dark:border-rose-800 animate-pulse'
+            }`}
+            title="Maximum 2 tab switches permitted before automatic examination termination"
+          >
+            <AlertTriangle className="w-3 h-3 shrink-0" />
+            <span>
+              {tabSwitchCount === 0
+                ? 'Tab Switches: 0/2 allowed'
+                : tabSwitchCount === 1
+                ? 'Tab Switches: 1/2 used (1 left)'
+                : 'Tab Switches: 2/2 used (FINAL WARNING)'}
+            </span>
+          </div>
+
+          {/* Copy/Paste Prohibited Badge */}
+          <div
+            className="hidden lg:flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700"
+            title="Clipboard copy and paste are strictly disabled"
+          >
+            <ClipboardX className="w-3 h-3 text-rose-500" />
+            <span>No Copy/Paste</span>
+          </div>
+
+          {/* Single Screen Enforced Badge */}
+          <div
+            className={`hidden xl:flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium border ${
+              isMultiScreenDetected
+                ? 'bg-rose-50 text-rose-700 border-rose-300 animate-pulse'
+                : 'bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+            }`}
+            title="Single screen enforced (secondary displays prohibited)"
+          >
+            <Monitor className="w-3 h-3 text-blue-500" />
+            <span>{isMultiScreenDetected ? 'Extra Screen Detected!' : 'Single Screen'}</span>
+          </div>
+
+          {/* Fullscreen Badge */}
           <div
             className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-medium border ${
               isFullscreen
@@ -633,13 +773,13 @@ export const ExamInterface: React.FC<ExamInterfaceProps> = ({
             }`}
           >
             <Maximize2 className="w-3 h-3" />
-            <span>{isFullscreen ? 'Fullscreen Active' : 'Fullscreen Required'}</span>
+            <span>{isFullscreen ? 'Fullscreen' : 'Fullscreen Required'}</span>
           </div>
 
           <button
             onClick={toggleFullscreen}
             title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
-            className="p-1.5 rounded text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            className="p-1.5 rounded text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
           >
             {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
           </button>
@@ -657,10 +797,10 @@ export const ExamInterface: React.FC<ExamInterfaceProps> = ({
 
           <button
             onClick={() => setShowSubmitModal(true)}
-            className="py-1.5 px-3.5 rounded-md bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 text-xs font-medium flex items-center gap-1.5 transition-colors shadow-xs"
+            className="py-1.5 px-3.5 rounded-md bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 text-xs font-medium flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
           >
             <Send className="w-3.5 h-3.5" />
-            <span>Finish & Submit</span>
+            <span>Finish</span>
           </button>
         </div>
       </header>
@@ -897,7 +1037,7 @@ export const ExamInterface: React.FC<ExamInterfaceProps> = ({
       )}
 
       {/* Mandatory Fullscreen Enforcement Modal */}
-      {!isFullscreen && !isTerminating && !isSubmitting && (
+      {!isFullscreen && !isTerminating && !isSubmitting && !tabWarningModal && !isMultiScreenDetected && (
         <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-md w-full p-6 text-center space-y-4 shadow-2xl">
             <div className="w-14 h-14 bg-indigo-100 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 rounded-full flex items-center justify-center mx-auto text-indigo-600 dark:text-indigo-400">
@@ -909,18 +1049,20 @@ export const ExamInterface: React.FC<ExamInterfaceProps> = ({
             </h2>
 
             <p className="text-xs text-slate-500 leading-relaxed">
-              This institutional examination requires full-screen access to maintain test integrity.
-              Please enter full-screen mode to begin or resume your examination.
+              This examination requires dedicated full-screen access to protect assessment integrity.
+              Please enter full-screen mode to begin or continue answering.
             </p>
 
-            <div className="p-3 bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/40 rounded-xl text-left text-xs text-rose-700 dark:text-rose-400 space-y-1">
+            <div className="p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/40 rounded-xl text-left text-xs text-amber-800 dark:text-amber-300 space-y-1.5">
               <div className="flex items-center gap-1.5 font-bold">
-                <AlertTriangle className="w-4 h-4 shrink-0" />
-                <span>Strict Tab-Switch Rule</span>
+                <AlertTriangle className="w-4 h-4 shrink-0 text-amber-600" />
+                <span>Institutional Integrity Rules</span>
               </div>
-              <p className="text-[11px] leading-tight">
-                Switching browser tabs or minimizing the browser window will <strong>immediately terminate and submit</strong> your examination.
-              </p>
+              <ul className="text-[11px] list-disc list-inside space-y-1 text-amber-700 dark:text-amber-400">
+                <li>Up to <strong>2 tab switches allowed</strong> with warnings (ends on 3rd)</li>
+                <li><strong>Copy/Paste is not allowed</strong> in code and text workspaces</li>
+                <li><strong>Another screen is not allowed</strong> (single monitor only)</li>
+              </ul>
             </div>
 
             <button
@@ -934,7 +1076,121 @@ export const ExamInterface: React.FC<ExamInterfaceProps> = ({
         </div>
       )}
 
-      {/* Immediate Tab Switch Termination Overlay */}
+      {/* Tab Switch Warning Modal (Warnings 1 & 2 of 2) */}
+      {tabWarningModal && !isTerminating && !isSubmitting && (
+        <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 border-2 border-amber-500 rounded-2xl max-w-md w-full p-6 text-center space-y-4 shadow-2xl">
+            <div
+              className={`w-14 h-14 rounded-full flex items-center justify-center mx-auto border-2 ${
+                tabWarningModal.count === 1
+                  ? 'bg-amber-100 text-amber-600 border-amber-400 dark:bg-amber-950/70'
+                  : 'bg-rose-100 text-rose-600 border-rose-500 dark:bg-rose-950/70 animate-pulse'
+              }`}
+            >
+              <AlertTriangle className="w-7 h-7" />
+            </div>
+
+            <div>
+              <span
+                className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${
+                  tabWarningModal.count === 1
+                    ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
+                    : 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300'
+                }`}
+              >
+                {tabWarningModal.count === 1 ? 'Warning 1 of 2' : 'Warning 2 of 2 · Final Warning'}
+              </span>
+              <h2 className="text-lg font-bold text-slate-900 dark:text-white mt-1">
+                {tabWarningModal.count === 1 ? 'Tab Switch Detected' : 'Final Tab Switch Warning'}
+              </h2>
+            </div>
+
+            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+              {tabWarningModal.count === 1 ? (
+                <>
+                  You switched away from the active examination window. You have used <strong>1 of 2 allowed tab switches</strong>.
+                </>
+              ) : (
+                <>
+                  You switched away from the examination window again. You have used <strong>2 of 2 allowed tab switches</strong>.
+                </>
+              )}
+            </p>
+
+            <div
+              className={`p-3 rounded-xl text-left text-xs border ${
+                tabWarningModal.count === 1
+                  ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-800'
+                  : 'bg-rose-50 dark:bg-rose-950/40 text-rose-800 dark:text-rose-300 border-rose-300 dark:border-rose-800'
+              }`}
+            >
+              <div className="font-bold flex items-center gap-1.5">
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                <span>{tabWarningModal.count === 1 ? '1 Warning Remaining' : 'Zero Warnings Remaining'}</span>
+              </div>
+              <p className="text-[11px] mt-1 leading-normal">
+                {tabWarningModal.count === 1
+                  ? 'Switching tabs a 3rd time will immediately terminate and submit your examination.'
+                  : 'Any subsequent tab switch or window minimization will terminate and submit your examination immediately.'}
+              </p>
+            </div>
+
+            <button
+              onClick={() => {
+                setTabWarningModal(null);
+                enterFullscreen();
+              }}
+              className="w-full py-3 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 font-semibold text-xs transition-colors flex items-center justify-center gap-2 shadow-sm cursor-pointer"
+            >
+              <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+              <span>I Understand, Return to Exam</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Multiple Screens / Another Screen Detected Modal */}
+      {isMultiScreenDetected && !isTerminating && (
+        <div className="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 border-2 border-rose-500 rounded-2xl max-w-md w-full p-6 text-center space-y-4 shadow-2xl">
+            <div className="w-14 h-14 bg-rose-100 dark:bg-rose-950/70 border border-rose-300 dark:border-rose-800 rounded-full flex items-center justify-center mx-auto text-rose-600">
+              <MonitorX className="w-7 h-7" />
+            </div>
+
+            <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+              Another Screen / External Monitor Detected
+            </h2>
+
+            <p className="text-xs text-slate-500 leading-relaxed">
+              Examination integrity rules strictly forbid multiple screens or external monitors.
+              The exam interface has been paused until only a single monitor is active.
+            </p>
+
+            <div className="p-3 bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/40 rounded-xl text-left text-xs text-rose-700 dark:text-rose-400 space-y-1">
+              <div className="font-bold flex items-center gap-1.5">
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                <span>Action Required: Disconnect External Displays</span>
+              </div>
+              <p className="text-[11px] leading-tight">
+                Please unplug secondary monitors, close extended desktops, or set your display settings to &ldquo;Single Screen Only&rdquo; to resume your exam.
+              </p>
+            </div>
+
+            <button
+              onClick={() => {
+                checkMultiScreen();
+                enterFullscreen();
+              }}
+              className="w-full py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs transition-colors flex items-center justify-center gap-2 shadow-sm cursor-pointer"
+            >
+              <Monitor className="w-4 h-4" />
+              <span>Verify Single Screen Disconnection</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Tab Switch Limit Exceeded Termination Overlay */}
       {isTerminating && (
         <div className="fixed inset-0 z-50 bg-rose-950/95 backdrop-blur-md flex items-center justify-center p-4">
           <div className="bg-white dark:bg-slate-900 border-2 border-rose-500 rounded-2xl max-w-md w-full p-6 text-center space-y-4 shadow-2xl">
@@ -943,16 +1199,16 @@ export const ExamInterface: React.FC<ExamInterfaceProps> = ({
             </div>
 
             <h2 className="text-xl font-black text-rose-600 dark:text-rose-400">
-              Examination Ended: Tab Switch Detected
+              Examination Ended: Tab Switch Limit Exceeded
             </h2>
 
             <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-              You switched browser tabs or navigated away from the active examination window.
-              As per institutional integrity rules, your session has been <strong>automatically terminated</strong>.
+              You exceeded the maximum limit of <strong>2 allowed tab switches</strong> (3rd switch detected).
+              As per institutional integrity rules, your examination has been <strong>automatically terminated and submitted</strong>.
             </p>
 
             <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl text-xs text-slate-500 font-mono text-center">
-              Sealing responses and transmitting final submission...
+              Sealing current answers and transmitting final submission...
             </div>
           </div>
         </div>

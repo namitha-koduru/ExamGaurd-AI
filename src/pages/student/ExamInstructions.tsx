@@ -2,7 +2,20 @@ import React, { useState, useEffect } from 'react';
 import { Exam } from '../../types';
 import { api } from '../../services/api';
 import { Logo } from '../../components/common/Logo';
-import { Check, AlertCircle, ShieldCheck, Clock, FileText, ArrowRight, ArrowLeft, RefreshCw, Maximize2, AlertTriangle } from 'lucide-react';
+import {
+  Check,
+  AlertCircle,
+  ShieldCheck,
+  Clock,
+  FileText,
+  ArrowRight,
+  ArrowLeft,
+  RefreshCw,
+  Maximize2,
+  AlertTriangle,
+  Monitor,
+  ClipboardX,
+} from 'lucide-react';
 
 interface ExamInstructionsProps {
   exam: Exam;
@@ -19,6 +32,7 @@ export const ExamInstructions: React.FC<ExamInstructionsProps> = ({
 }) => {
   const [browserOk, setBrowserOk] = useState<boolean>(true);
   const [fullscreenSupported, setFullscreenSupported] = useState<boolean>(true);
+  const [singleScreenOk, setSingleScreenOk] = useState<boolean>(true);
   const [sensorOk, setSensorOk] = useState<boolean>(true);
   const [serverOk, setServerOk] = useState<boolean>(false);
   const [sessionReady, setSessionReady] = useState<boolean>(false);
@@ -39,7 +53,14 @@ export const ExamInstructions: React.FC<ExamInstructionsProps> = ({
     );
     setFullscreenSupported(Boolean(hasFullscreen));
 
-    // 3. In-browser behavioral sensor check (No extension required)
+    // 3. Screen display check (another screen not allowed)
+    const isMultiScreen = typeof window !== 'undefined' && Boolean(
+      (window.screen as any)?.isExtended === true ||
+      (window.screenX < -20 || window.screenX > (window.screen.width + 20))
+    );
+    setSingleScreenOk(!isMultiScreen);
+
+    // 4. In-browser behavioral sensor check (No extension required)
     const hasWebApis = typeof window !== 'undefined' && 'addEventListener' in window;
     setSensorOk(hasWebApis);
 
@@ -79,7 +100,7 @@ export const ExamInstructions: React.FC<ExamInstructionsProps> = ({
     }
   };
 
-  const allPassed = browserOk && sensorOk && serverOk && sessionReady;
+  const allPassed = browserOk && fullscreenSupported && singleScreenOk && sensorOk && serverOk && sessionReady;
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8 space-y-6">
@@ -143,18 +164,24 @@ export const ExamInstructions: React.FC<ExamInstructionsProps> = ({
         </p>
       </div>
 
-      {/* Fullscreen & Tab Switch Rule Enforcement Banner */}
-      <div className="p-4 rounded-lg bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/60 text-xs space-y-2">
+      {/* Strict Institutional Rules Banner */}
+      <div className="p-4 rounded-lg bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/60 text-xs space-y-2.5">
         <div className="flex items-center gap-2 font-semibold text-rose-900 dark:text-rose-300">
           <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
-          <span>Strict Examination Rules: Fullscreen Access & Tab Switching</span>
+          <span>Strict Examination Rules & Integrity Policy</span>
         </div>
-        <ul className="text-rose-800/90 dark:text-rose-300/90 list-disc list-inside space-y-1 text-[11px] leading-relaxed">
+        <ul className="text-rose-800/90 dark:text-rose-300/90 list-disc list-inside space-y-1.5 text-[11px] leading-relaxed">
           <li>
-            <strong>Fullscreen Access Mandatory:</strong> The examination will launch in full screen. Exiting full screen will halt test progress until re-entered.
+            <strong>Fullscreen Access Required:</strong> The examination runs in dedicated full-screen mode. Exiting full-screen will pause testing until re-entered.
           </li>
           <li>
-            <strong>Immediate Termination on Tab Switch:</strong> Switching browser tabs, switching applications, or minimizing the window will <strong>instantly end and submit your examination</strong> with zero re-entry permitted.
+            <strong>2 Tab Switches Allowed:</strong> You are permitted up to <strong>2 tab switches</strong> with warnings. A 3rd tab switch or window loss will <strong>instantly end and submit your examination</strong> with zero re-entry permitted.
+          </li>
+          <li>
+            <strong>Copy/Paste Strictly Prohibited:</strong> Clipboard copying, cutting, and pasting (including Ctrl+C, Ctrl+V, Cmd+C, Cmd+V) are disabled across all question areas and the code workspace.
+          </li>
+          <li>
+            <strong>Another Screen Is Not Allowed:</strong> Multiple monitors, external screens, or extended desktop displays are strictly prohibited. The examination must be taken on a single display.
           </li>
         </ul>
       </div>
@@ -223,6 +250,22 @@ export const ExamInstructions: React.FC<ExamInstructionsProps> = ({
             ) : (
               <span className="text-amber-500 font-medium flex items-center gap-1">
                 <AlertCircle className="w-3.5 h-3.5" /> Browser Prompted
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center justify-between p-2 rounded bg-slate-50 dark:bg-slate-800/50">
+            <div className="flex items-center gap-1.5 text-slate-700 dark:text-slate-300">
+              <Monitor className="w-3.5 h-3.5 text-blue-500" />
+              <span>Single Display Monitor Verification</span>
+            </div>
+            {singleScreenOk ? (
+              <span className="text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
+                <Check className="w-3.5 h-3.5" /> Single Screen Verified
+              </span>
+            ) : (
+              <span className="text-rose-500 font-medium flex items-center gap-1">
+                <AlertCircle className="w-3.5 h-3.5" /> Multiple Displays Detected (Disconnect Extra Screen)
               </span>
             )}
           </div>

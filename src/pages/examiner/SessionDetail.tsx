@@ -119,10 +119,10 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
         </button>
 
         <div className="flex items-center gap-3">
-          {session.terminatedReason === 'TAB_SWITCH_DETECTED' && (
+          {(session.terminatedReason === 'TAB_SWITCH_LIMIT_EXCEEDED' || session.terminatedReason === 'TAB_SWITCH_DETECTED') && (
             <span className="px-2.5 py-1 rounded bg-rose-100 text-rose-800 dark:bg-rose-950/80 dark:text-rose-300 font-bold text-xs flex items-center gap-1 border border-rose-300 dark:border-rose-800">
               <AlertTriangle className="w-3.5 h-3.5" />
-              Tab Switch Terminated
+              Tab Switch Limit Exceeded
             </span>
           )}
           <StatusBadge status={session.status} />
@@ -130,14 +130,14 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
         </div>
       </div>
 
-      {session.terminatedReason === 'TAB_SWITCH_DETECTED' && (
+      {(session.terminatedReason === 'TAB_SWITCH_LIMIT_EXCEEDED' || session.terminatedReason === 'TAB_SWITCH_DETECTED') && (
         <div className="p-4 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 rounded-lg text-xs space-y-1">
           <div className="flex items-center gap-2 font-bold text-rose-800 dark:text-rose-300">
             <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
-            <span>Automatic Termination Event: Browser Tab Switch Detected</span>
+            <span>Automatic Termination Event: Tab Switch Limit Exceeded (3rd switch detected)</span>
           </div>
           <p className="text-rose-700 dark:text-rose-400 text-[11px] leading-relaxed">
-            The candidate switched away from the active examination browser tab or minimized the window. In accordance with institutional integrity protocol, the examination was instantly terminated and submitted with current responses.
+            The candidate exceeded the maximum allowed 2 tab switches during the examination. In accordance with institutional integrity protocol, the examination was instantly terminated and submitted with current responses.
           </p>
         </div>
       )}

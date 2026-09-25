@@ -75,7 +75,19 @@ export const DescriptiveWorkspace: React.FC<DescriptiveWorkspaceProps> = ({
           rows={10}
           value={text}
           onChange={handleChange}
-          placeholder="Type your structured explanation and analysis here..."
+          onCopy={(e) => {
+            e.preventDefault();
+            onTelemetryEvent('COPY_BLOCKED', { questionId: question.id });
+          }}
+          onCut={(e) => {
+            e.preventDefault();
+            onTelemetryEvent('CUT_BLOCKED', { questionId: question.id });
+          }}
+          onPaste={(e) => {
+            e.preventDefault();
+            onTelemetryEvent('PASTE_BLOCKED', { questionId: question.id });
+          }}
+          placeholder="Type your structured explanation and analysis here (copy/paste disabled)..."
           className="w-full p-4 text-xs font-sans rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-slate-900 dark:focus:ring-white resize-y shadow-xs"
         />
 

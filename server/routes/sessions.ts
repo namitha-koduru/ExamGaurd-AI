@@ -132,15 +132,15 @@ router.post('/:id/submit', async (req, res) => {
     const anomalyReport = calculateExplainableRisk(features, true);
     anomalyReport.sessionId = req.params.id;
 
-    if (terminatedReason === 'TAB_SWITCH_DETECTED') {
-      anomalyReport.detectedPatterns.unshift('Examination automatically terminated: Browser tab switch / window blur detected');
+    if (terminatedReason === 'TAB_SWITCH_LIMIT_EXCEEDED' || terminatedReason === 'TAB_SWITCH_DETECTED') {
+      anomalyReport.detectedPatterns.unshift('Examination automatically terminated: Tab switch limit exceeded (allowed: 2 switches)');
       anomalyReport.contributingFactors.unshift({
-        factor: 'Unauthorized Tab Switch (Examination Ended)',
+        factor: 'Tab Switch Limit Exceeded (3rd switch detected)',
         points: 40,
-        explanation: 'Candidate switched tabs or minimized the active examination window. Immediate session termination enforced.',
+        explanation: 'Candidate switched tabs or minimized the active examination window after exhausting 2 permitted warnings. Immediate session termination enforced.',
         severity: 'high',
         featureName: 'tab_switch_violation',
-        sessionValue: 'Tab switch detected (terminated)',
+        sessionValue: '3 tab switches (limit: 2)',
         baselineValue: '0 tab switches (fullscreen enforced)',
       });
       anomalyReport.riskScore = Math.max(anomalyReport.riskScore, 85);
@@ -223,8 +223,8 @@ router.post('/:id/submit', async (req, res) => {
       status: 'SUBMITTED' as const,
       terminatedReason: terminatedReason || undefined,
       proctorStatus: (terminatedReason ? 'FLAGGED' : 'UNREVIEWED') as 'FLAGGED' | 'UNREVIEWED',
-      proctorNotes: terminatedReason === 'TAB_SWITCH_DETECTED'
-        ? 'Examination automatically terminated due to tab switch / window blur violation.'
+      proctorNotes: terminatedReason === 'TAB_SWITCH_LIMIT_EXCEEDED' || terminatedReason === 'TAB_SWITCH_DETECTED'
+        ? 'Examination automatically terminated: Candidate exceeded the allowed limit of 2 tab switches (3rd switch detected).'
         : undefined,
       score: totalScore,
       maxScore: maxPossibleScore,
@@ -252,8 +252,8 @@ router.post('/:id/submit', async (req, res) => {
       actorRole: 'STUDENT',
       action: terminatedReason ? 'SESSION_TERMINATED_TAB_SWITCH' : 'SESSION_SUBMITTED',
       targetId: req.params.id,
-      details: terminatedReason === 'TAB_SWITCH_DETECTED'
-        ? `Session terminated immediately due to tab switch violation. Risk Index: ${anomalyReport.riskScore} (${anomalyReport.riskLevel}).`
+      details: terminatedReason
+        ? `Session terminated immediately: Candidate exceeded allowed tab switches (Limit: 2). Risk Index: ${anomalyReport.riskScore} (${anomalyReport.riskLevel}).`
         : `Session finalized with Risk Index: ${anomalyReport.riskScore} (${anomalyReport.riskLevel}).`,
     });
 

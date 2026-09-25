@@ -284,6 +284,58 @@ export const CodeWorkspace: React.FC<CodeWorkspaceProps> = ({
           value={code}
           onChange={handleEditorChange}
           theme="vs-dark"
+          onMount={(editor, monaco) => {
+            editor.onKeyDown((e) => {
+              if (
+                (e.ctrlKey || e.metaKey) &&
+                (e.keyCode === monaco.KeyCode.KeyV ||
+                  e.keyCode === monaco.KeyCode.KeyC ||
+                  e.keyCode === monaco.KeyCode.KeyX)
+              ) {
+                e.preventDefault();
+                e.stopPropagation();
+                onTelemetryEvent(
+                  e.keyCode === monaco.KeyCode.KeyV
+                    ? 'PASTE_BLOCKED'
+                    : e.keyCode === monaco.KeyCode.KeyC
+                    ? 'COPY_BLOCKED'
+                    : 'CUT_BLOCKED',
+                  { questionId: question.id }
+                );
+              }
+            });
+
+            const domNode = editor.getDomNode();
+            if (domNode) {
+              domNode.addEventListener(
+                'paste',
+                (e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onTelemetryEvent('PASTE_BLOCKED', { questionId: question.id });
+                },
+                true
+              );
+              domNode.addEventListener(
+                'copy',
+                (e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onTelemetryEvent('COPY_BLOCKED', { questionId: question.id });
+                },
+                true
+              );
+              domNode.addEventListener(
+                'cut',
+                (e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onTelemetryEvent('CUT_BLOCKED', { questionId: question.id });
+                },
+                true
+              );
+            }
+          }}
           options={{
             minimap: { enabled: false },
             fontSize: 13,
@@ -291,6 +343,7 @@ export const CodeWorkspace: React.FC<CodeWorkspaceProps> = ({
             scrollBeyondLastLine: false,
             automaticLayout: true,
             tabSize: 2,
+            contextmenu: false,
           }}
         />
       </div>

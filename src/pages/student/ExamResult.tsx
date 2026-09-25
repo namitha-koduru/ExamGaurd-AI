@@ -29,7 +29,8 @@ interface ExamResultProps {
 export const ExamResult: React.FC<ExamResultProps> = ({ session, onReturnDashboard }) => {
   const answeredCount = Object.keys(session.answers || {}).length;
   const features = session.features;
-  const isTabSwitchTerminated = session.terminatedReason === 'TAB_SWITCH_DETECTED';
+  const isTabSwitchTerminated =
+    session.terminatedReason === 'TAB_SWITCH_LIMIT_EXCEEDED' || session.terminatedReason === 'TAB_SWITCH_DETECTED';
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-10 text-center space-y-6">
@@ -49,12 +50,12 @@ export const ExamResult: React.FC<ExamResultProps> = ({ session, onReturnDashboa
 
       <div>
         <h1 className="text-xl font-bold text-slate-900 dark:text-white">
-          {isTabSwitchTerminated ? 'Examination Ended: Tab Switch Detected' : 'Examination Submitted Successfully'}
+          {isTabSwitchTerminated ? 'Examination Ended: Tab Switch Limit Exceeded' : 'Examination Submitted Successfully'}
         </h1>
         <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
           {isTabSwitchTerminated ? (
             <>
-              Your examination for <strong>{session.examTitle}</strong> was terminated immediately due to a tab switch. Responses recorded up to the violation have been sealed and filed.
+              Your examination for <strong>{session.examTitle}</strong> was automatically ended after exceeding the allowed limit of 2 tab switches. Responses recorded up to the violation have been sealed and submitted.
             </>
           ) : (
             <>
@@ -69,10 +70,10 @@ export const ExamResult: React.FC<ExamResultProps> = ({ session, onReturnDashboa
         <div className="bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 rounded-2xl p-4 text-left space-y-1.5 max-w-md mx-auto">
           <div className="flex items-center gap-2 text-rose-700 dark:text-rose-400 font-bold text-xs">
             <AlertTriangle className="w-4 h-4 shrink-0" />
-            <span>Tab Switch Violation Recorded</span>
+            <span>Tab Switch Limit Exceeded (Violation Recorded)</span>
           </div>
           <p className="text-[11px] text-rose-600 dark:text-rose-300 leading-relaxed">
-            Institutional integrity policy strictly requires remaining in the examination environment in full screen. When a tab switch or window focus deviation was detected, the session was automatically ended and flagged for faculty review.
+            Institutional integrity policy permits a maximum of 2 tab switches with warnings. Upon the 3rd tab switch or window focus deviation, the examination was automatically terminated and flagged for academic proctor review.
           </p>
         </div>
       )}
